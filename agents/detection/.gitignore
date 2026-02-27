@@ -1,1 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+node_modules/
+*.log
+local.settings.json
+.python_packages/
+.DS_Store
 
