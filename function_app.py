@@ -6,12 +6,26 @@ from openai import OpenAI
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
-# ── GitHub Models client ─────────────────────────────────────────────────────
-client = OpenAI(
-    base_url="https://models.inference.ai.azure.com",
-    api_key=os.environ["GITHUB_TOKEN"],
-)
+# ── GitHub Models client (lazy-initialised to avoid startup crash) ────────────
 MODEL = "o4-mini"  # reasoning model — no temperature/response_format params
+_client: OpenAI | None = None
+
+
+def _get_client() -> OpenAI:
+    """Return a cached OpenAI client; raises RuntimeError if GITHUB_TOKEN is unset."""
+    global _client
+    if _client is None:
+        token = os.environ.get("GITHUB_TOKEN")
+        if not token:
+            raise RuntimeError(
+                "GITHUB_TOKEN application setting is not configured. "
+                "Add it in Azure Portal → Configuration → Application Settings."
+            )
+        _client = OpenAI(
+            base_url="https://models.inference.ai.azure.com",
+            api_key=token,
+        )
+    return _client
 
 SYSTEM_PROMPT = """You are FraudShield India, an expert UPI fraud detection system.
 Analyze messages for fraud patterns common in India. Classify into one of:
@@ -37,7 +51,7 @@ def classify_message(message: str, source: str = "unknown", sender: str = "unkno
     """Call GitHub Models (o4-mini) to classify a UPI fraud message."""
     user_content = f"Source: {source}\nSender: {sender}\nMessage: {message}"
 
-    response = client.chat.completions.create(
+    response = _get_client().chat.completions.create(
         model=MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -114,8 +128,14 @@ def classify(req: func.HttpRequest) -> func.HttpResponse:
 # ── /api/health ───────────────────────────────────────────────────────────────
 @app.route(route="health", methods=["GET"])
 def health(req: func.HttpRequest) -> func.HttpResponse:
+    token_configured = bool(os.environ.get("GITHUB_TOKEN"))
     return func.HttpResponse(
-        json.dumps({"status": "ok", "service": "FraudShield India", "model": MODEL}),
+        json.dumps({
+            "status": "ok",
+            "service": "FraudShield India",
+            "model": MODEL,
+            "github_token_configured": token_configured,
+        }),
         status_code=200,
         headers={"Content-Type": "application/json"},
     )
