@@ -9,10 +9,6 @@ env:
   AZURE_FUNCTIONAPP_NAME: fraudshield-api
   PYTHON_VERSION: "3.11"
 
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -29,30 +25,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt --target=".python_packages/lib/site-packages"
 
-      - name: Login to Azure
-        uses: Azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Remove conflicting WEBSITE_RUN_FROM_PACKAGE URL
-        run: |
-          current=$(az functionapp config appsettings list \
-            --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value" -o tsv)
-          if [[ "$current" == http* ]]; then
-            echo "Removing WEBSITE_RUN_FROM_PACKAGE URL to enable zipdeploy..."
-            az functionapp config appsettings delete \
-              --name ${{ env.AZURE_FUNCTIONAPP_NAME }} \
-              --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-              --setting-names WEBSITE_RUN_FROM_PACKAGE
-          fi
-
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
           app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
           package: "."
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
           respect-funcignore: true

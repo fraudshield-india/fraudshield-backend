@@ -3,20 +3,17 @@ Multi-agent AI pipeline for real-time UPI fraud detection, investigation, and re
 
 ## Deployment
 
-The project deploys to Azure Functions via GitHub Actions (`.github/workflows/deploy.yml`). The workflow triggers on pushes to `main` and uses OpenID Connect (OIDC) federated credentials for passwordless authentication with Azure.
+The project deploys to Azure Functions via GitHub Actions (`.github/workflows/deploy.yml`). The workflow triggers on pushes to `main` and uses the Azure Functions **publish profile** for authentication.
 
 ### Required GitHub Secrets
 
 | Secret | Description |
 |---|---|
-| `AZURE_CLIENT_ID` | Application (client) ID of the Azure AD app registration |
-| `AZURE_TENANT_ID` | Directory (tenant) ID of the Azure AD tenant |
-| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
-| `AZURE_RESOURCE_GROUP` | Azure resource group containing the Function App |
+| `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` | Publish profile XML downloaded from the Azure Function App |
 
-### Azure Setup for OIDC
+### Setup
 
-1. Register an application in Azure Active Directory.
-2. Add a federated credential for the GitHub Actions workflow (set the subject to `repo:fraudshield-india/fraudshield-backend:ref:refs/heads/main`).
-3. Assign the application the required roles (e.g., Contributor) on the target resource group.
-4. Add the secrets listed above to the repository's **Settings > Secrets and variables > Actions**.
+1. In the Azure Portal, navigate to your Function App (`fraudshield-api`).
+2. Click **Get publish profile** to download the `.PublishSettings` file.
+3. Copy the entire XML content of the file.
+4. Add it as a repository secret named `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` in **Settings > Secrets and variables > Actions**.
