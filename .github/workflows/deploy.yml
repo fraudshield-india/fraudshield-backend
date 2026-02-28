@@ -9,6 +9,10 @@ env:
   AZURE_FUNCTIONAPP_NAME: fraudshield-api
   PYTHON_VERSION: "3.11"
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -28,7 +32,9 @@ jobs:
       - name: Login to Azure
         uses: Azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Remove conflicting WEBSITE_RUN_FROM_PACKAGE URL
         run: |
