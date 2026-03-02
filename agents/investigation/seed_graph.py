@@ -28,7 +28,8 @@ COSMOS_ENDPOINT = os.getenv("COSMOS_DB_ENDPOINT", "").replace("https://", "").re
 COSMOS_KEY = os.getenv("COSMOS_DB_KEY", "")
 
 if not COSMOS_ENDPOINT or not COSMOS_KEY:
-    print("❌ Set COSMOS_DB_ENDPOINT and COSMOS_DB_KEY in your .env file")
+    print("❌ Set COSMOS_DB_ENDPOINT and COSMOS_DB_KEY in your .env file (local) "
+          "or as GitHub Secrets (CI/CD)")
     exit(1)
 
 print(f"🔌 Connecting to: {COSMOS_ENDPOINT}")
