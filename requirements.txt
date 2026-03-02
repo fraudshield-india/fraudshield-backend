@@ -1,2 +1,2 @@
 azure-functions==1.21.3
-openai==1.30.5
+openai==1.82.0
