@@ -957,9 +957,61 @@ function addLiveFeedItem() {
   }
 }
 
+// ── Live data fetch from backend API (falls back to hardcoded data) ───────────
+
+const API_BASE = window.location.origin;
+
+function applyLiveData(data) {
+  if (data.feed && Array.isArray(data.feed) && data.feed.length > 0) {
+    FEED_DATA.length = 0;
+    data.feed.forEach(item => FEED_DATA.push(item));
+  }
+  if (data.network && data.network.nodes && data.network.edges) {
+    SCAM_NETWORK.nodes = data.network.nodes;
+    SCAM_NETWORK.edges = data.network.edges;
+  }
+  if (data.hotspots && Array.isArray(data.hotspots) && data.hotspots.length > 0) {
+    HOTSPOTS.length = 0;
+    data.hotspots.forEach(h => HOTSPOTS.push(h));
+    // Refresh heatmap and markers with live data
+    const liveHeatData = HOTSPOTS.map(h => [h[0], h[1], h[2]]);
+    heatLayer.setLatLngs(liveHeatData);
+    markersLayer.clearLayers();
+    HOTSPOTS.forEach(h => {
+      const [lat, lng, intensity, city, state, count, cat] = h;
+      const color = CAT_COLORS[cat] || "#f97316";
+      const radius = 5 + intensity * 12;
+      const marker = L.circleMarker([lat, lng], {
+        radius, fillColor: color, color, weight: 1, opacity: 0.9, fillOpacity: 0.6,
+      }).bindTooltip(
+        `<strong>${city}, ${state}</strong><br>${count} reports · ${cat.replace(/_/g," ")}`,
+        { className: "scam-tooltip", permanent: false }
+      );
+      markersLayer.addLayer(marker);
+    });
+  }
+}
+
+function fetchLiveData() {
+  fetch(API_BASE + "/api/dashboard-data")
+    .then(res => { if (!res.ok) throw new Error("API returned " + res.status); return res.json(); })
+    .then(data => {
+      applyLiveData(data);
+      renderFeed();
+      renderCategoryStats();
+      drawNetwork();
+    })
+    .catch(() => {
+      // API unreachable — hardcoded fallback data is already in place
+    });
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 window.addEventListener("load", () => {
+  // Attempt to load live data; render with fallback immediately
+  fetchLiveData();
+
   renderFeed();
   renderCategoryStats();
   drawNetwork();
@@ -973,6 +1025,8 @@ window.addEventListener("load", () => {
 
   // Simulate live incoming scams
   setInterval(addLiveFeedItem, 8000);
+  // Refresh live data every 60 seconds
+  setInterval(fetchLiveData, 60000);
 });
 
 window.addEventListener("resize", drawNetwork);

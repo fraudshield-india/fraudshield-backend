@@ -60,6 +60,7 @@ if __name__ == "__main__":
                 results.append({"template_a": a, "template_b": b, "similarity": round(sim, 3)})
 
     # Save results
+    os.makedirs("data", exist_ok=True)
     with open("data/scam_similarities.json", "w") as f:
         json.dump(results, f, indent=2)
 
