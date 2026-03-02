@@ -1,1 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FraudShield India — Live Threat Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<style>
+  :root {
+    --bg: #060810;
+    --surface: #0d1117;
+    --surface2: #161b22;
+    --border: #21262d;
+    --accent: #f97316;
+    --accent2: #ef4444;
+    --accent3: #22d3ee;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --green: #3fb950;
+    --yellow: #d29922;
+  }
 
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Scanline overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(13,17,23,0.95);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-shield {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    animation: pulse-shield 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-shield {
+    0%, 100% { filter: drop-shadow(0 0 4px var(--accent)); }
+    50% { filter: drop-shadow(0 0 12px var(--accent)); }
+  }
+
+  .logo-text {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-text span { color: var(--accent); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .live-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--green);
+    border: 1px solid var(--green);
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: blink 1.2s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 16px;
+    color: var(--accent);
+  }
+
+  /* ── Main layout ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: auto 1fr;
+    gap: 0;
+    height: calc(100vh - 69px);
+  }
+
+  /* ── Stats bar ── */
+  .stats-bar {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat-card {
+    padding: 14px 20px;
+    border-right: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    transition: background 0.2s;
+  }
+
+  .stat-card:hover { background: var(--surface); }
+
+  .stat-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transition: transform 0.3s;
+  }
+
+  .stat-card:hover::after { transform: scaleX(1); }
+
+  .stat-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 4px;
+  }
+
+  .stat-value {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .stat-value.red { color: var(--accent2); }
+  .stat-value.orange { color: var(--accent); }
+  .stat-value.cyan { color: var(--accent3); }
+  .stat-value.green { color: var(--green); }
+
+  .stat-sub {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ── Map ── */
+  .map-container {
+    position: relative;
+    overflow: hidden;
+  }
+
+  #map {
+    width: 100%;
+    height: 100%;
+    background: #0a0e14;
+  }
+
+  .map-overlay {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .map-btn {
+    background: rgba(13,17,23,0.92);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 14px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+
+  .map-btn:hover, .map-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+  }
+
+  .map-legend {
+    position: absolute;
+    bottom: 24px;
+    left: 16px;
+    z-index: 500;
+    background: rgba(13,17,23,0.92);
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+  }
+
+  .legend-title {
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab {
+    flex: 1;
+    padding: 12px;
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: var(--surface);
+  }
+
+  .tab-content { display: none; flex: 1; overflow-y: auto; }
+  .tab-content.active { display: flex; flex-direction: column; }
+
+  /* ── Scam feed ── */
+  .feed-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+    cursor: pointer;
+    animation: slide-in 0.3s ease;
+  }
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .feed-item:hover { background: var(--surface); }
+
+  .feed-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .feed-category {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .cat-fake_cashback     { background: rgba(249,115,22,0.2); color: var(--accent); }
+  .cat-digital_arrest    { background: rgba(239,68,68,0.2);  color: var(--accent2); }
+  .cat-kyc_freeze        { background: rgba(34,211,238,0.2); color: var(--accent3); }
+  .cat-job_scam          { background: rgba(210,153,34,0.2); color: var(--yellow); }
+  .cat-lottery_scam      { background: rgba(63,185,80,0.2);  color: var(--green); }
+  .cat-govt_impersonation{ background: rgba(139,92,246,0.2); color: #a78bfa; }
+  .cat-phishing_link     { background: rgba(239,68,68,0.15); color: #f87171; }
+
+  .feed-time {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+  }
+
+  .feed-location {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+
+  .feed-location strong { color: var(--text); }
+
+  .feed-upi {
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    color: var(--accent2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .feed-conf {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .conf-bar {
+    flex: 1;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .conf-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    border-radius: 2px;
+  }
+
+  .conf-pct {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    min-width: 30px;
+    text-align: right;
+  }
+
+  /* ── Network graph tab ── */
+  #network-canvas {
+    width: 100%;
+    flex: 1;
+    background: var(--surface);
+  }
+
+  .network-legend {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .net-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+  }
+
+  .net-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Leaflet overrides ── */
+  .leaflet-container { background: #0a0e14 !important; }
+  .leaflet-tile { filter: brightness(0.4) saturate(0.3) hue-rotate(200deg); }
+  .leaflet-control-zoom a {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+  }
+  .leaflet-control-attribution { display: none; }
+
+  /* ── Tooltip ── */
+  .scam-tooltip {
+    background: rgba(13,17,23,0.95) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+    font-family: 'Space Mono', monospace !important;
+    font-size: 11px !important;
+    border-radius: 0 !important;
+    padding: 8px 12px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-shield">🛡</div>
+    <div>
+      <div class="logo-text">Fraud<span>Shield</span> India</div>
+      <div style="font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:1px;">THREAT INTELLIGENCE DASHBOARD</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      LIVE
+    </div>
+    <div class="header-stat">
+      <strong id="total-counter">0</strong>
+      scams today
+    </div>
+    <div class="header-stat">
+      <strong id="blocked-counter">0</strong>
+      blocked
+    </div>
+    <div style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;">
+      MIT Manipal · AI Unlocked 2025
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">Total Scams</div>
+      <div class="stat-value red" id="stat-total">2,847</div>
+      <div class="stat-sub">↑ 12% this week</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Digital Arrest</div>
+      <div class="stat-value orange" id="stat-arrest">634</div>
+      <div class="stat-sub">Highest risk</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Fake Cashback</div>
+      <div class="stat-value orange" id="stat-cashback">891</div>
+      <div class="stat-sub">Most common</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">KYC Freeze</div>
+      <div class="stat-value cyan" id="stat-kyc">421</div>
+      <div class="stat-sub">↑ 34% this month</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Amount Saved</div>
+      <div class="stat-value green">₹4.2Cr</div>
+      <div class="stat-sub">Est. prevented loss</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Accuracy</div>
+      <div class="stat-value green">96.4%</div>
+      <div class="stat-sub">gpt-4o-mini model</div>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div class="map-container">
+    <div id="map"></div>
+
+    <div class="map-overlay">
+      <button class="map-btn active" onclick="setLayer('heat')">HEATMAP</button>
+      <button class="map-btn" onclick="setLayer('markers')">MARKERS</button>
+      <button class="map-btn" onclick="setLayer('both')">BOTH</button>
+    </div>
+
+    <div class="map-legend">
+      <div class="legend-title">Scam Intensity</div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#ef4444"></div>
+        Critical (50+ reports)
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#f97316"></div>
+        High (20-50 reports)
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#eab308"></div>
+        Medium (5-20 reports)
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#22d3ee"></div>
+        Low (&lt;5 reports)
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <button class="tab active" onclick="switchTab('feed', this)">LIVE FEED</button>
+      <button class="tab" onclick="switchTab('network', this)">SCAM NETWORK</button>
+      <button class="tab" onclick="switchTab('stats', this)">CATEGORY</button>
+    </div>
+
+    <!-- Feed tab -->
+    <div class="tab-content active" id="tab-feed"></div>
+
+    <!-- Network tab -->
+    <div class="tab-content" id="tab-network">
+      <canvas id="network-canvas"></canvas>
+      <div class="network-legend">
+        <div class="net-legend-item">
+          <div class="net-dot" style="background:#ef4444"></div>UPI ID
+        </div>
+        <div class="net-legend-item">
+          <div class="net-dot" style="background:#22d3ee"></div>Phone
+        </div>
+        <div class="net-legend-item">
+          <div class="net-dot" style="background:#f97316"></div>Ring
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats tab -->
+    <div class="tab-content" id="tab-stats" style="padding:16px;gap:8px;">
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+
+const HOTSPOTS = [
+  // [lat, lng, intensity, city, state, count, category]
+  [28.6139, 77.2090, 1.0, "New Delhi",      "Delhi",          523, "digital_arrest"],
+  [19.0760, 72.8777, 0.95,"Mumbai",         "Maharashtra",    487, "fake_cashback"],
+  [12.9716, 77.5946, 0.85,"Bengaluru",      "Karnataka",      412, "phishing_link"],
+  [22.5726, 88.3639, 0.80,"Kolkata",        "West Bengal",    389, "kyc_freeze"],
+  [17.3850, 78.4867, 0.75,"Hyderabad",      "Telangana",      356, "job_scam"],
+  [13.0827, 80.2707, 0.72,"Chennai",        "Tamil Nadu",     334, "govt_impersonation"],
+  [23.0225, 72.5714, 0.68,"Ahmedabad",      "Gujarat",        298, "fake_cashback"],
+  [26.8467, 80.9462, 0.65,"Lucknow",        "Uttar Pradesh",  276, "lottery_scam"],
+  [18.5204, 73.8567, 0.62,"Pune",           "Maharashtra",    254, "phishing_link"],
+  [26.9124, 75.7873, 0.60,"Jaipur",         "Rajasthan",      234, "kyc_freeze"],
+  [25.5941, 85.1376, 0.58,"Patna",          "Bihar",          218, "digital_arrest"],
+  [21.1458, 79.0882, 0.55,"Nagpur",         "Maharashtra",    198, "fake_cashback"],
+  [30.7333, 76.7794, 0.52,"Chandigarh",     "Punjab",         187, "job_scam"],
+  [23.2599, 77.4126, 0.50,"Bhopal",         "Madhya Pradesh", 175, "govt_impersonation"],
+  [22.7196, 75.8577, 0.48,"Indore",         "Madhya Pradesh", 164, "lottery_scam"],
+  [27.1767, 78.0081, 0.45,"Agra",           "Uttar Pradesh",  152, "digital_arrest"],
+  [15.2993, 74.1240, 0.42,"Goa",            "Goa",            98,  "phishing_link"],
+  [8.5241,  76.9366, 0.40,"Thiruvananthapuram","Kerala",       87,  "kyc_freeze"],
+  [20.9374, 85.0900, 0.38,"Bhubaneswar",    "Odisha",         76,  "fake_cashback"],
+  [26.1445, 91.7362, 0.35,"Guwahati",       "Assam",          65,  "job_scam"],
+  [32.7266, 74.8570, 0.32,"Jammu",          "J&K",            54,  "govt_impersonation"],
+  [24.5854, 73.7125, 0.30,"Udaipur",        "Rajasthan",      48,  "lottery_scam"],
+  [11.0168, 76.9558, 0.28,"Coimbatore",     "Tamil Nadu",     43,  "digital_arrest"],
+  [16.3067, 80.4365, 0.26,"Vijayawada",     "Andhra Pradesh", 38,  "fake_cashback"],
+  [21.2514, 81.6296, 0.24,"Raipur",         "Chhattisgarh",   32,  "phishing_link"],
+  [23.3441, 85.3096, 0.22,"Ranchi",         "Jharkhand",      27,  "kyc_freeze"],
+  [34.0837, 74.7973, 0.20,"Srinagar",       "J&K",            21,  "job_scam"],
+  [31.1048, 77.1734, 0.18,"Shimla",         "Himachal Pradesh",16, "govt_impersonation"],
+  [27.3314, 88.6138, 0.15,"Gangtok",        "Sikkim",         11,  "lottery_scam"],
+  [25.4670, 91.3662, 0.12,"Shillong",       "Meghalaya",      8,   "digital_arrest"],
+];
+
+const SCAM_NETWORK = {
+  nodes: [
+    { id: "ph3",   label: "+91-98765-00003", type: "phone",  x: 120, y: 80  },
+    { id: "upi4",  label: "cashback@okaxis", type: "upi",    cat: "fake_cashback",   x: 60,  y: 160 },
+    { id: "upi7",  label: "refund@paytm",    type: "upi",    cat: "fake_cashback",   x: 120, y: 200 },
+    { id: "upi13", label: "doubleincome@ybl",type: "ring",   cat: "fake_cashback",   x: 180, y: 160 },
+    { id: "ph1",   label: "+91-98765-00001", type: "phone",  x: 280, y: 80  },
+    { id: "upi1",  label: "taskpay@ybl",     type: "upi",    cat: "job_scam",        x: 240, y: 160 },
+    { id: "upi8",  label: "yt.task@ybl",     type: "upi",    cat: "job_scam",        x: 300, y: 160 },
+    { id: "ph4",   label: "+91-98765-00004", type: "phone",  x: 120, y: 300 },
+    { id: "upi5",  label: "cbi.penalty@upi", type: "ring",   cat: "digital_arrest",  x: 60,  y: 370 },
+    { id: "upi16", label: "cybercell@ybl",   type: "upi",    cat: "digital_arrest",  x: 180, y: 370 },
+    { id: "ph10",  label: "+91-98765-00010", type: "phone",  x: 280, y: 300 },
+    { id: "upi10", label: "loanfast@ybl",    type: "upi",    cat: "job_scam",        x: 220, y: 370 },
+    { id: "upi15", label: "meta-jobs@ybl",   type: "upi",    cat: "job_scam",        x: 290, y: 400 },
+    { id: "upi19", label: "bgv-check@ybl",   type: "upi",    cat: "job_scam",        x: 340, y: 370 },
+  ],
+  edges: [
+    { from: "ph3",  to: "upi4"  },
+    { from: "ph3",  to: "upi7"  },
+    { from: "ph3",  to: "upi13" },
+    { from: "ph1",  to: "upi1"  },
+    { from: "ph1",  to: "upi8"  },
+    { from: "ph4",  to: "upi5"  },
+    { from: "ph4",  to: "upi16" },
+    { from: "ph10", to: "upi10" },
+    { from: "ph10", to: "upi15" },
+    { from: "ph10", to: "upi19" },
+  ]
+};
+
+const FEED_DATA = [
+  { city: "Mumbai", state: "Maharashtra", cat: "fake_cashback",      upi: "cashback.official@okaxis", conf: 0.97, minsAgo: 1  },
+  { city: "Delhi",  state: "Delhi",       cat: "digital_arrest",     upi: "cbi.penalty@upi",          conf: 0.99, minsAgo: 2  },
+  { city: "Pune",   state: "Maharashtra", cat: "phishing_link",      upi: "N/A",                      conf: 0.94, minsAgo: 3  },
+  { city: "Lucknow",state: "UP",          cat: "lottery_scam",       upi: "kbcprize2024@paytm",       conf: 0.96, minsAgo: 5  },
+  { city: "Chennai",state: "Tamil Nadu",  cat: "govt_impersonation", upi: "echallane.pay@ybl",        conf: 0.91, minsAgo: 7  },
+  { city: "Kolkata",state: "West Bengal", cat: "kyc_freeze",         upi: "sbikyc.update@ybl",        conf: 0.98, minsAgo: 9  },
+  { city: "Jaipur", state: "Rajasthan",   cat: "job_scam",           upi: "taskpay.earn@ybl",         conf: 0.93, minsAgo: 11 },
+  { city: "Hyderabad",state:"Telangana",  cat: "fake_cashback",      upi: "refund.process@paytm",     conf: 0.95, minsAgo: 14 },
+  { city: "Patna",  state: "Bihar",       cat: "digital_arrest",     upi: "cybercell@ybl",            conf: 0.98, minsAgo: 16 },
+  { city: "Agra",   state: "UP",          cat: "lottery_scam",       upi: "jiodraw@paytm",            conf: 0.90, minsAgo: 19 },
+  { city: "Bengaluru",state:"Karnataka",  cat: "phishing_link",      upi: "N/A",                      conf: 0.92, minsAgo: 22 },
+  { city: "Ahmedabad",state:"Gujarat",    cat: "fake_cashback",      upi: "doubleincome@ybl",         conf: 0.96, minsAgo: 25 },
+];
+
+const CAT_COLORS = {
+  fake_cashback:      "#f97316",
+  digital_arrest:     "#ef4444",
+  kyc_freeze:         "#22d3ee",
+  job_scam:           "#d29922",
+  lottery_scam:       "#3fb950",
+  govt_impersonation: "#a78bfa",
+  phishing_link:      "#f87171",
+};
+
+// ── Map setup ─────────────────────────────────────────────────────────────────
+
+const map = L.map("map", {
+  center: [22.5, 82.5],
+  zoom: 5,
+  zoomControl: true,
+  minZoom: 4,
+  maxZoom: 10,
+});
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "OSM"
+}).addTo(map);
+
+// Heatmap layer
+const heatData = HOTSPOTS.map(h => [h[0], h[1], h[2]]);
+const heatLayer = L.heatLayer(heatData, {
+  radius: 40,
+  blur: 30,
+  maxZoom: 10,
+  gradient: { 0.2: "#22d3ee", 0.5: "#f97316", 0.8: "#ef4444", 1.0: "#ffffff" }
+});
+
+// Markers layer
+const markersLayer = L.layerGroup();
+HOTSPOTS.forEach(h => {
+  const [lat, lng, intensity, city, state, count, cat] = h;
+  const color = CAT_COLORS[cat] || "#f97316";
+  const radius = 5 + intensity * 12;
+
+  const marker = L.circleMarker([lat, lng], {
+    radius,
+    fillColor: color,
+    color: color,
+    weight: 1,
+    opacity: 0.9,
+    fillOpacity: 0.6,
+  }).bindTooltip(
+    `<strong>${city}, ${state}</strong><br>${count} reports · ${cat.replace(/_/g," ")}`,
+    { className: "scam-tooltip", permanent: false }
+  );
+  markersLayer.addLayer(marker);
+});
+
+heatLayer.addTo(map);
+let currentLayer = "heat";
+
+function setLayer(mode) {
+  document.querySelectorAll(".map-btn").forEach(b => b.classList.remove("active"));
+  event.target.classList.add("active");
+  currentLayer = mode;
+
+  if (mode === "heat") {
+    map.addLayer(heatLayer);
+    map.removeLayer(markersLayer);
+  } else if (mode === "markers") {
+    map.removeLayer(heatLayer);
+    map.addLayer(markersLayer);
+  } else {
+    map.addLayer(heatLayer);
+    map.addLayer(markersLayer);
+  }
+}
+
+// ── Feed ──────────────────────────────────────────────────────────────────────
+
+function renderFeed() {
+  const container = document.getElementById("tab-feed");
+  container.innerHTML = "";
+  FEED_DATA.forEach((item, i) => {
+    const el = document.createElement("div");
+    el.className = "feed-item";
+    el.style.animationDelay = `${i * 0.05}s`;
+    el.innerHTML = `
+      <div class="feed-header">
+        <span class="feed-category cat-${item.cat}">${item.cat.replace(/_/g," ").toUpperCase()}</span>
+        <span class="feed-time">${item.minsAgo}m ago</span>
+      </div>
+      <div class="feed-location"><strong>${item.city}</strong>, ${item.state}</div>
+      <div class="feed-upi">${item.upi}</div>
+      <div class="feed-conf">
+        <div class="conf-bar"><div class="conf-fill" style="width:${item.conf*100}%"></div></div>
+        <div class="conf-pct">${Math.round(item.conf*100)}%</div>
+      </div>
+    `;
+    container.appendChild(el);
+  });
+}
+
+// ── Network graph (canvas) ────────────────────────────────────────────────────
+
+function drawNetwork() {
+  const canvas = document.getElementById("network-canvas");
+  const container = document.getElementById("tab-network");
+  canvas.width  = container.offsetWidth  || 340;
+  canvas.height = container.offsetHeight - 50 || 350;
+
+  const ctx = canvas.getContext("2d");
+  const scaleX = canvas.width  / 420;
+  const scaleY = canvas.height / 460;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#0d1117";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const nodeMap = {};
+  SCAM_NETWORK.nodes.forEach(n => { nodeMap[n.id] = n; });
+
+  // Draw edges
+  SCAM_NETWORK.edges.forEach(e => {
+    const a = nodeMap[e.from];
+    const b = nodeMap[e.to];
+    if (!a || !b) return;
+
+    const isRing = a.type === "phone" && nodeMap[e.to]?.type === "ring";
+    ctx.beginPath();
+    ctx.moveTo(a.x * scaleX, a.y * scaleY);
+    ctx.lineTo(b.x * scaleX, b.y * scaleY);
+    ctx.strokeStyle = isRing ? "rgba(249,115,22,0.7)" : "rgba(239,68,68,0.35)";
+    ctx.lineWidth = isRing ? 2 : 1;
+    if (isRing) {
+      ctx.setLineDash([]);
+    } else {
+      ctx.setLineDash([4, 4]);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // Draw nodes
+  SCAM_NETWORK.nodes.forEach(n => {
+    const x = n.x * scaleX;
+    const y = n.y * scaleY;
+
+    const color = n.type === "phone"
+      ? "#22d3ee"
+      : n.type === "ring"
+      ? "#f97316"
+      : "#ef4444";
+
+    const radius = n.type === "phone" ? 8 : 6;
+
+    // Glow
+    const grd = ctx.createRadialGradient(x, y, 0, x, y, radius * 3);
+    grd.addColorStop(0, color + "44");
+    grd.addColorStop(1, "transparent");
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Node
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = "#0d1117";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle = "#7d8590";
+    ctx.font = `${Math.round(9 * Math.min(scaleX, scaleY) + 2)}px 'Space Mono', monospace`;
+    ctx.textAlign = "center";
+    ctx.fillText(n.label.split("@")[0], x, y + radius + 12);
+  });
+}
+
+// ── Category stats tab ────────────────────────────────────────────────────────
+
+function renderCategoryStats() {
+  const container = document.getElementById("tab-stats");
+  const cats = [
+    { name: "Fake Cashback",      count: 891, pct: 31, cat: "fake_cashback"      },
+    { name: "Govt Impersonation", count: 634, pct: 22, cat: "govt_impersonation" },
+    { name: "Phishing Link",      count: 521, pct: 18, cat: "phishing_link"      },
+    { name: "Digital Arrest",     count: 412, pct: 14, cat: "digital_arrest"     },
+    { name: "Job Scam",           count: 234, pct: 8,  cat: "job_scam"           },
+    { name: "KYC Freeze",         count: 98,  pct: 3,  cat: "kyc_freeze"         },
+    { name: "Lottery Scam",       count: 57,  pct: 2,  cat: "lottery_scam"       },
+  ];
+
+  cats.forEach(c => {
+    const color = CAT_COLORS[c.cat] || "#f97316";
+    const div = document.createElement("div");
+    div.style.cssText = "padding:0 4px";
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px;">
+        <span>${c.name}</span>
+        <span style="font-family:'Space Mono',monospace;color:${color}">${c.count}</span>
+      </div>
+      <div style="background:var(--border);border-radius:2px;height:6px;margin-bottom:12px;overflow:hidden;">
+        <div style="width:${c.pct}%;height:100%;background:${color};border-radius:2px;
+          transition:width 1s ease;animation:grow 1s ease forwards;"></div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+
+function switchTab(name, btn) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("tab-" + name).classList.add("active");
+  if (name === "network") {
+    setTimeout(drawNetwork, 50);
+  }
+}
+
+// ── Animated counters ─────────────────────────────────────────────────────────
+
+function animateCounter(el, target, duration = 2000) {
+  let start = 0;
+  const step = target / (duration / 16);
+  const timer = setInterval(() => {
+    start = Math.min(start + step, target);
+    el.textContent = Math.floor(start).toLocaleString("en-IN");
+    if (start >= target) clearInterval(timer);
+  }, 16);
+}
+
+// ── Live feed simulation ──────────────────────────────────────────────────────
+
+let feedIndex = 0;
+function addLiveFeedItem() {
+  const templates = [
+    { city: "Surat",     state: "Gujarat",    cat: "fake_cashback",      upi: "cashback@ybl",          conf: 0.96 },
+    { city: "Kanpur",    state: "UP",         cat: "digital_arrest",     upi: "cbi.officer@upi",       conf: 0.99 },
+    { city: "Nagpur",    state: "Maharashtra",cat: "phishing_link",      upi: "N/A",                   conf: 0.93 },
+    { city: "Indore",    state: "MP",         cat: "govt_impersonation", upi: "rto-challan@ybl",       conf: 0.91 },
+    { city: "Bhopal",    state: "MP",         cat: "job_scam",           upi: "workfromhome@ybl",      conf: 0.94 },
+  ];
+
+  const item = { ...templates[feedIndex % templates.length], minsAgo: 0 };
+  feedIndex++;
+
+  const container = document.getElementById("tab-feed");
+  const el = document.createElement("div");
+  el.className = "feed-item";
+  el.style.borderLeft = `3px solid ${CAT_COLORS[item.cat]}`;
+  el.innerHTML = `
+    <div class="feed-header">
+      <span class="feed-category cat-${item.cat}">${item.cat.replace(/_/g," ").toUpperCase()}</span>
+      <span class="feed-time">just now</span>
+    </div>
+    <div class="feed-location"><strong>${item.city}</strong>, ${item.state}</div>
+    <div class="feed-upi">${item.upi}</div>
+    <div class="feed-conf">
+      <div class="conf-bar"><div class="conf-fill" style="width:${item.conf*100}%"></div></div>
+      <div class="conf-pct">${Math.round(item.conf*100)}%</div>
+    </div>
+  `;
+  container.insertBefore(el, container.firstChild);
+
+  // Update counter
+  const counter = document.getElementById("total-counter");
+  counter.textContent = (parseInt(counter.textContent.replace(/,/g,"")) + 1).toLocaleString("en-IN");
+
+  // Keep feed max 20 items
+  while (container.children.length > 20) {
+    container.removeChild(container.lastChild);
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+window.addEventListener("load", () => {
+  renderFeed();
+  renderCategoryStats();
+  drawNetwork();
+
+  animateCounter(document.getElementById("total-counter"), 2847);
+  animateCounter(document.getElementById("blocked-counter"), 2736);
+  animateCounter(document.getElementById("stat-total"), 2847);
+  animateCounter(document.getElementById("stat-arrest"), 634);
+  animateCounter(document.getElementById("stat-cashback"), 891);
+  animateCounter(document.getElementById("stat-kyc"), 421);
+
+  // Simulate live incoming scams
+  setInterval(addLiveFeedItem, 8000);
+});
+
+window.addEventListener("resize", drawNetwork);
+</script>
+</body>
+</html>
