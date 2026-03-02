@@ -45,18 +45,22 @@ if not COSMOS_ENDPOINT or not COSMOS_KEY:
 COSMOS_ENDPOINT = COSMOS_ENDPOINT.replace("https://", "").replace("http://", "").rstrip("/").removesuffix(":443")
 print(f"🔌 Connecting to: {COSMOS_ENDPOINT}")
 
+QUERY_TIMEOUT = 30  # seconds — prevents hanging forever on Cosmos DB
+
 gremlin = client.Client(
     f"wss://{COSMOS_ENDPOINT}:443/",
     "g",
     username="/dbs/FraudShieldDB/colls/ScamNetwork",
     password=COSMOS_KEY,
     message_serializer=serializer.GraphSONSerializersV2d0(),
+    read_timeout=QUERY_TIMEOUT,
+    write_timeout=QUERY_TIMEOUT,
 )
 
 def run(query: str, bindings: dict = None):
     """Execute a Gremlin query and return results."""
     try:
-        result = gremlin.submitAsync(query, bindings=bindings).result()
+        result = gremlin.submitAsync(query, bindings=bindings).result(timeout=QUERY_TIMEOUT)
         return result
     except Exception as e:
         print(f"  ⚠️  Query error: {e}")
@@ -199,8 +203,8 @@ def seed_links():
 
 def print_stats():
     print("\n📊 Graph Statistics:")
-    v_count = gremlin.submitAsync("g.V().count()").result()
-    e_count = gremlin.submitAsync("g.E().count()").result()
+    v_count = gremlin.submitAsync("g.V().count()").result(timeout=QUERY_TIMEOUT)
+    e_count = gremlin.submitAsync("g.E().count()").result(timeout=QUERY_TIMEOUT)
     print(f"  Vertices: {v_count}")
     print(f"  Edges:    {e_count}")
 
@@ -208,7 +212,7 @@ def print_stats():
     rings = gremlin.submitAsync(
         "g.V().hasLabel('Phone').where(out('OPERATED_BY').count().is(gte(2)))"
         ".values('number')"
-    ).result()
+    ).result(timeout=QUERY_TIMEOUT)
     print(f"  {rings}")
 
 
@@ -218,12 +222,16 @@ if __name__ == "__main__":
     print("🕸️  FraudShield India — Seeding Scam Network Graph")
     print("=" * 55)
 
-    drop_all()
-    seed_upis()
-    seed_phones()
-    seed_links()
-    print_stats()
-
-    gremlin.close()
-    print("\n✅ Graph seeded successfully!")
-    print("   View at: portal.azure.com → fraudshield-graphdb → Data Explorer")
+    try:
+        drop_all()
+        seed_upis()
+        seed_phones()
+        seed_links()
+        print_stats()
+        print("\n✅ Graph seeded successfully!")
+        print("   View at: portal.azure.com → fraudshield-graphdb → Data Explorer")
+    except Exception as exc:
+        print(f"\n❌ Seed failed: {exc}")
+        sys.exit(1)
+    finally:
+        gremlin.close()
