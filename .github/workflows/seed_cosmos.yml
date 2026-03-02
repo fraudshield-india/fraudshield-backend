@@ -12,7 +12,22 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install gremlinpython python-dotenv
-      - run: python agents/investigation/seed_graph.py
+      - name: Check required secrets
+        id: check_secrets
+        run: |
+          if [ -z "$COSMOS_DB_ENDPOINT" ] || [ -z "$COSMOS_DB_KEY" ]; then
+            echo "⚠️  COSMOS_DB_ENDPOINT or COSMOS_DB_KEY secrets are not configured."
+            echo "   Add them in: Settings → Secrets and variables → Actions"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          COSMOS_DB_ENDPOINT: ${{ secrets.COSMOS_DB_ENDPOINT }}
+          COSMOS_DB_KEY: ${{ secrets.COSMOS_DB_KEY }}
+      - name: Seed graph
+        if: steps.check_secrets.outputs.skip == 'false'
+        run: python agents/investigation/seed_graph.py
         env:
           COSMOS_DB_ENDPOINT: ${{ secrets.COSMOS_DB_ENDPOINT }}
           COSMOS_DB_KEY: ${{ secrets.COSMOS_DB_KEY }}
