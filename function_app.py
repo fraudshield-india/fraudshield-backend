@@ -2,6 +2,7 @@ import azure.functions as func
 import json
 import logging
 import os
+import requests
 from openai import OpenAI
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
@@ -255,13 +256,7 @@ def _format_telegram_result(result: dict) -> str:
 @app.route(route="telegram", methods=["POST"])
 def telegram_webhook(req: func.HttpRequest) -> func.HttpResponse:
     """Telegram webhook endpoint — always returns 200 to avoid retries."""
-    import requests  # imported inline per requirements
-
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    api_url = os.getenv(
-        "FRAUDSHIELD_API_URL",
-        "https://fraudshield-api.azurewebsites.net/api/classify",
-    )
 
     if not bot_token:
         logging.error("TELEGRAM_BOT_TOKEN is not configured")
@@ -288,15 +283,9 @@ def telegram_webhook(req: func.HttpRequest) -> func.HttpResponse:
             )
             return func.HttpResponse("OK", status_code=200)
 
-        # All other text — classify via FraudShield API
+        # All other text — classify directly (no external HTTP hop)
         try:
-            resp = requests.post(
-                api_url,
-                json={"message": text, "source": "telegram", "sender": "telegram_user"},
-                timeout=60,
-            )
-            resp.raise_for_status()
-            result = resp.json()
+            result = classify_message(text, "telegram", "telegram_user")
             reply = _format_telegram_result(result)
         except Exception as classify_err:
             logging.exception("Telegram classify error: %s", classify_err)
