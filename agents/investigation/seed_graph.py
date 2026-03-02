@@ -24,14 +24,20 @@ except ImportError:
     print("Run: pip install gremlinpython")
     exit(1)
 
-COSMOS_ENDPOINT = os.getenv("COSMOS_DB_ENDPOINT", "").replace("https://", "").replace(":443/", "")
-COSMOS_KEY = os.getenv("COSMOS_DB_KEY", "")
+# Debug: print what we're getting
+COSMOS_ENDPOINT = os.environ.get("COSMOS_DB_ENDPOINT", "")
+COSMOS_KEY = os.environ.get("COSMOS_DB_KEY", "")
+
+print(f"ENDPOINT present: {bool(COSMOS_ENDPOINT)}")
+print(f"KEY present: {bool(COSMOS_KEY)}")
+print(f"ENDPOINT value: '{COSMOS_ENDPOINT[:30]}...' " if COSMOS_ENDPOINT else "ENDPOINT: EMPTY")
 
 if not COSMOS_ENDPOINT or not COSMOS_KEY:
-    print("❌ Set COSMOS_DB_ENDPOINT and COSMOS_DB_KEY in your .env file (local) "
-          "or as GitHub Secrets (CI/CD)")
+    print("Available env vars:", [k for k in os.environ.keys() if 'COSMOS' in k.upper()])
+    print("❌ Set COSMOS_DB_ENDPOINT and COSMOS_DB_KEY in your .env file")
     exit(1)
 
+COSMOS_ENDPOINT = COSMOS_ENDPOINT.replace("https://", "").replace(":443/", "")
 print(f"🔌 Connecting to: {COSMOS_ENDPOINT}")
 
 gremlin = client.Client(
