@@ -1,3 +1,7 @@
+# Apply nest_asyncio patch to prevent event loop conflicts with gremlinpython on Python 3.11+
+import nest_asyncio
+nest_asyncio.apply()
+
 """
 FraudShield India — Cosmos DB Gremlin Seed Script
 Seeds scam UPI IDs, phone numbers, and their connections into the graph.
