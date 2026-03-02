@@ -52,10 +52,10 @@ gremlin = client.Client(
     message_serializer=serializer.GraphSONSerializersV2d0(),
 )
 
-def run(query: str):
+def run(query: str, bindings: dict = None):
     """Execute a Gremlin query and return results."""
     try:
-        result = gremlin.submitAsync(query).result()
+        result = gremlin.submitAsync(query, bindings=bindings).result()
         return result
     except Exception as e:
         print(f"  ⚠️  Query error: {e}")
@@ -63,6 +63,13 @@ def run(query: str):
 
 def drop_all():
     """Clear all existing vertices for a clean seed."""
+    if os.environ.get("ENV", "").lower() == "production":
+        print("❌ Refusing to drop graph in production environment. Unset ENV=production to proceed.")
+        exit(1)
+    confirm = input("⚠️  This will wipe ALL graph data. Type 'yes' to confirm: ")
+    if confirm.strip().lower() != "yes":
+        print("Aborted.")
+        exit(0)
     print("🗑️  Clearing existing graph data...")
     run("g.V().drop()")
     time.sleep(2)
@@ -135,17 +142,22 @@ def seed_upis():
     print(f"\n📌 Seeding {len(SCAM_UPIS)} scam UPI IDs...")
     for uid, vpa, cat, count, status, state, victims in SCAM_UPIS:
         q = (
-            f"g.addV('UpiId')"
-            f".property('id','{uid}')"
-            f".property('vpa','{vpa}')"
-            f".property('category','{cat}')"
-            f".property('report_count',{count})"
-            f".property('status','{status}')"
-            f".property('state','{state}')"
-            f".property('estimated_victims',{victims})"
-            f".property('pk','{cat}')"
+            "g.addV('UpiId')"
+            ".property('id', vid)"
+            ".property('vpa', vpa)"
+            ".property('category', cat)"
+            ".property('report_count', report_count)"
+            ".property('status', status)"
+            ".property('state', state)"
+            ".property('estimated_victims', estimated_victims)"
+            ".property('pk', cat)"
         )
-        run(q)
+        bindings = {
+            "vid": uid, "vpa": vpa, "cat": cat,
+            "report_count": count, "status": status, "state": state,
+            "estimated_victims": victims,
+        }
+        run(q, bindings)
         print(f"  ✅ {vpa} ({cat}) — {state}")
         time.sleep(0.5)
 
@@ -154,14 +166,15 @@ def seed_phones():
     print(f"\n📱 Seeding {len(SCAM_PHONES)} scam phone numbers...")
     for pid, number, state, operator in SCAM_PHONES:
         q = (
-            f"g.addV('Phone')"
-            f".property('id','{pid}')"
-            f".property('number','{number}')"
-            f".property('state','{state}')"
-            f".property('operator','{operator}')"
-            f".property('pk','phone')"
+            "g.addV('Phone')"
+            ".property('id', pid)"
+            ".property('number', number)"
+            ".property('state', state)"
+            ".property('operator', operator)"
+            ".property('pk', 'phone')"
         )
-        run(q)
+        bindings = {"pid": pid, "number": number, "state": state, "operator": operator}
+        run(q, bindings)
         print(f"  ✅ {number} ({state}, {operator})")
         time.sleep(0.5)
 
@@ -169,8 +182,9 @@ def seed_phones():
 def seed_links():
     print(f"\n🔗 Creating {len(LINKS)} edges (phone → UPI links)...")
     for pid, uid, rel in LINKS:
-        q = f"g.V('{pid}').addE('{rel}').to(g.V('{uid}'))"
-        run(q)
+        q = "g.V(pid).addE(rel).to(g.V(uid))"
+        bindings = {"pid": pid, "uid": uid, "rel": rel}
+        run(q, bindings)
         print(f"  ✅ {pid} → {uid}")
         time.sleep(0.5)
 
@@ -184,9 +198,8 @@ def print_stats():
 
     print("\n🔍 Scam rings (phones controlling 2+ UPI IDs):")
     rings = gremlin.submitAsync(
-        "g.V().hasLabel('Phone').as('p')"
-        ".out('OPERATED_BY').count().is(gte(2))"
-        ".select('p').values('number')"
+        "g.V().hasLabel('Phone').where(out('OPERATED_BY').count().is(gte(2)))"
+        ".values('number')"
     ).result()
     print(f"  {rings}")
 

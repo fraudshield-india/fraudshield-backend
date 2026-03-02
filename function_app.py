@@ -9,7 +9,7 @@ from openai import OpenAI
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 # ── GitHub Models client (lazy-initialised to avoid startup crash) ────────────
-MODEL = "o4-mini"  # reasoning model — no temperature/response_format params
+MODEL = "gpt-4o-mini"
 _client: OpenAI | None = None
 
 def _get_client() -> OpenAI:
@@ -38,7 +38,9 @@ Respond ONLY with valid JSON in this exact schema:
   "is_scam": true/false,
   "category": "<category>",
   "confidence": <0.0-1.0>,
-  "explanation_hindi": "<brief explanation in Hindi>",
+  "risk_level": "high/medium/low",
+  "explanation_en": "<brief explanation in English>",
+  "explanation_hi": "<brief explanation in Hindi>",
   "red_flags": ["<flag1>", "<flag2>"],
   "complaint_form": {
     "portal": "cybercrime.gov.in",
@@ -57,7 +59,8 @@ def classify_message(message: str, source: str = "unknown", sender: str = "unkno
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
-        max_completion_tokens=512,
+        temperature=0.1,
+        max_tokens=512,
     )
 
     # o4-mini may wrap output in ```json ... ``` — strip it just in case
@@ -183,6 +186,28 @@ def batch_classify(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
+# ── /api/dashboard-data ───────────────────────────────────────────────────────
+@app.route(route="dashboard-data", methods=["GET"])
+def dashboard_data(req: func.HttpRequest) -> func.HttpResponse:
+    """Return live scam feed, network graph data, and hotspot data for the dashboard."""
+    cors_headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Content-Type": "application/json",
+    }
+    # Returns empty lists when no live data is available; the dashboard uses its
+    # hardcoded fallback in that case.
+    payload = {
+        "feed": [],
+        "network": {"nodes": [], "edges": []},
+        "hotspots": [],
+    }
+    return func.HttpResponse(
+        json.dumps(payload, ensure_ascii=False),
+        status_code=200,
+        headers=cors_headers,
+    )
+
+
 # ── /api/telegram ─────────────────────────────────────────────────────────────
 
 WELCOME_MSG = """🛡️ <b>FraudShield India में आपका स्वागत है!</b>
@@ -210,7 +235,7 @@ def _format_telegram_result(result: dict) -> str:
     is_scam: bool = result.get("is_scam", False)
     category: str = result.get("category", "unknown")
     confidence: float = result.get("confidence", 0.0)
-    explanation: str = result.get("explanation_hindi", "")
+    explanation: str = result.get("explanation_hi", result.get("explanation_hindi", ""))
     red_flags: list = result.get("red_flags", [])
     complaint: dict = result.get("complaint_form", {})
 
