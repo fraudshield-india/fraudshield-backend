@@ -66,7 +66,11 @@ def drop_all():
     if os.environ.get("ENV", "").lower() == "production":
         print("❌ Refusing to drop graph in production environment. Unset ENV=production to proceed.")
         exit(1)
-    confirm = input("⚠️  This will wipe ALL graph data. Type 'yes' to confirm: ")
+    try:
+        confirm = input("⚠️  This will wipe ALL graph data. Type 'yes' to confirm: ")
+    except EOFError:
+        print("Aborted (non-interactive mode).")
+        exit(0)
     if confirm.strip().lower() != "yes":
         print("Aborted.")
         exit(0)
