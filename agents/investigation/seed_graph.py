@@ -1,13 +1,9 @@
-# Apply nest_asyncio patch to prevent event loop conflicts with gremlinpython on Python 3.11+
-import nest_asyncio
-nest_asyncio.apply()
-
 """
 FraudShield India — Cosmos DB Gremlin Seed Script
 Seeds scam UPI IDs, phone numbers, and their connections into the graph.
 
 Usage:
-  pip install gremlinpython python-dotenv
+  pip install gremlinpython python-dotenv nest_asyncio
   python agents/investigation/seed_graph.py
 
 Env vars needed:
@@ -15,76 +11,112 @@ Env vars needed:
   COSMOS_DB_KEY=your_primary_key
 """
 
+# Apply nest_asyncio patch to prevent event loop conflicts with gremlinpython on Python 3.11+
+import nest_asyncio
+nest_asyncio.apply()
+
+import logging
 import os
 import sys
 import time
+import traceback
+from concurrent.futures import TimeoutError as FutureTimeoutError
+
 from dotenv import load_dotenv
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
+log = logging.getLogger(__name__)
 
 load_dotenv()
 
-# ── Connect to Cosmos DB Gremlin ──────────────────────────────────────────────
 try:
     from gremlin_python.driver import client, serializer
 except ImportError:
-    print("Run: pip install gremlinpython")
-    exit(1)
+    log.error("Run: pip install gremlinpython")
+    sys.exit(1)
 
-# Debug: print what we're getting
-COSMOS_ENDPOINT = os.environ.get("COSMOS_DB_ENDPOINT", "")
-COSMOS_KEY = os.environ.get("COSMOS_DB_KEY", "")
+QUERY_TIMEOUT = 30   # seconds — per-query timeout to prevent hanging
+BATCH_SIZE = 5       # concurrent queries to submit at once
 
-print(f"ENDPOINT present: {bool(COSMOS_ENDPOINT)}")
-print(f"KEY present: {bool(COSMOS_KEY)}")
-print(f"ENDPOINT value: '{COSMOS_ENDPOINT[:30]}...' " if COSMOS_ENDPOINT else "ENDPOINT: EMPTY")
 
-if not COSMOS_ENDPOINT or not COSMOS_KEY:
-    print("Available env vars:", [k for k in os.environ.keys() if 'COSMOS' in k.upper()])
-    print("❌ Set COSMOS_DB_ENDPOINT and COSMOS_DB_KEY in your .env file")
-    exit(1)
+def _build_client(endpoint: str, key: str):
+    """Create and return a connected Gremlin client with timeout configuration."""
+    log.info("🔌 Connecting to Gremlin endpoint: %s", endpoint)
+    t0 = time.time()
+    gremlin_client = client.Client(
+        f"wss://{endpoint}:443/",
+        "g",
+        username="/dbs/FraudShieldDB/colls/ScamNetwork",
+        password=key,
+        message_serializer=serializer.GraphSONSerializersV2d0(),
+        read_timeout=QUERY_TIMEOUT,
+        write_timeout=QUERY_TIMEOUT,
+    )
+    log.info("✅ Client created in %.1fs", time.time() - t0)
+    return gremlin_client
 
-COSMOS_ENDPOINT = COSMOS_ENDPOINT.replace("https://", "").replace("http://", "").rstrip("/").removesuffix(":443")
-print(f"🔌 Connecting to: {COSMOS_ENDPOINT}")
 
-QUERY_TIMEOUT = 30  # seconds — prevents hanging forever on Cosmos DB
-
-gremlin = client.Client(
-    f"wss://{COSMOS_ENDPOINT}:443/",
-    "g",
-    username="/dbs/FraudShieldDB/colls/ScamNetwork",
-    password=COSMOS_KEY,
-    message_serializer=serializer.GraphSONSerializersV2d0(),
-    read_timeout=QUERY_TIMEOUT,
-    write_timeout=QUERY_TIMEOUT,
-)
-
-def run(query: str, bindings: dict = None):
-    """Execute a Gremlin query and return results."""
+def run(gremlin_client, query: str, bindings: dict = None):
+    """Execute a single Gremlin query and return results."""
     try:
-        result = gremlin.submitAsync(query, bindings=bindings).result(timeout=QUERY_TIMEOUT)
-        return result
-    except Exception as e:
-        print(f"  ⚠️  Query error: {e}")
+        future = gremlin_client.submitAsync(query, bindings=bindings)
+        return future.result(timeout=QUERY_TIMEOUT)
+    except FutureTimeoutError:
+        log.error("⏱️  Query timed out after %ds: %.100s", QUERY_TIMEOUT, query)
+        return None
+    except Exception:
+        log.error("⚠️  Query failed: %.100s\n%s", query, traceback.format_exc())
         return None
 
-def drop_all():
+
+def run_batch(gremlin_client, queries):
+    """
+    Submit queries in concurrent batches for higher throughput.
+    Each batch of BATCH_SIZE queries is submitted concurrently; results are
+    collected before the next batch is dispatched (avoids rate-limit bursts).
+    """
+    results = []
+    for chunk_start in range(0, len(queries), BATCH_SIZE):
+        chunk = queries[chunk_start : chunk_start + BATCH_SIZE]
+        log.debug("  Submitting batch %d–%d", chunk_start + 1, chunk_start + len(chunk))
+        futures = [gremlin_client.submitAsync(q, bindings=b) for q, b in chunk]
+        for i, fut in enumerate(futures):
+            idx = chunk_start + i
+            try:
+                results.append(fut.result(timeout=QUERY_TIMEOUT))
+            except FutureTimeoutError:
+                log.error("⏱️  Batch item %d timed out", idx)
+                results.append(None)
+            except Exception:
+                log.error("⚠️  Batch item %d failed:\n%s", idx, traceback.format_exc())
+                results.append(None)
+    return results
+
+
+def drop_all(gremlin_client):
     """Clear all existing vertices for a clean seed."""
     if os.environ.get("ENV", "").lower() == "production":
-        print("❌ Refusing to drop graph in production environment. Unset ENV=production to proceed.")
-        exit(1)
+        log.error("❌ Refusing to drop graph in production. Unset ENV=production to proceed.")
+        sys.exit(1)
     if sys.stdin.isatty():
         try:
             confirm = input("⚠️  This will wipe ALL graph data. Type 'yes' to confirm: ")
         except EOFError:
-            print("Aborted (non-interactive mode).")
-            exit(0)
+            log.info("Aborted (non-interactive mode).")
+            sys.exit(0)
         if confirm.strip().lower() != "yes":
-            print("Aborted.")
-            exit(0)
+            log.info("Aborted.")
+            sys.exit(0)
     else:
-        print("🤖 Non-interactive mode detected — skipping confirmation prompt.")
-    print("🗑️  Clearing existing graph data...")
-    run("g.V().drop()")
-    time.sleep(2)
+        log.info("🤖 Non-interactive mode -- skipping drop confirmation.")
+    log.info("🗑️  Clearing existing graph data...")
+    t0 = time.time()
+    run(gremlin_client, "g.V().drop()")
+    log.info("   Cleared in %.1fs", time.time() - t0)
 
 # ── Scam UPI IDs ──────────────────────────────────────────────────────────────
 # Format: (id, vpa, category, report_count, status, state, victims_est)
@@ -150,8 +182,10 @@ LINKS = [
 
 # ── Seed UPI vertices ─────────────────────────────────────────────────────────
 
-def seed_upis():
-    print(f"\n📌 Seeding {len(SCAM_UPIS)} scam UPI IDs...")
+def seed_upis(gremlin_client):
+    log.info("📌 Seeding %d scam UPI vertices...", len(SCAM_UPIS))
+    t0 = time.time()
+    queries = []
     for uid, vpa, cat, count, status, state, victims in SCAM_UPIS:
         q = (
             "g.addV('UpiId')"
@@ -169,13 +203,15 @@ def seed_upis():
             "report_count": count, "status": status, "state": state,
             "estimated_victims": victims,
         }
-        run(q, bindings)
-        print(f"  ✅ {vpa} ({cat}) — {state}")
-        time.sleep(0.5)
+        queries.append((q, bindings))
+    run_batch(gremlin_client, queries)
+    log.info("   ✅ %d UPI vertices seeded in %.1fs", len(SCAM_UPIS), time.time() - t0)
 
 
-def seed_phones():
-    print(f"\n📱 Seeding {len(SCAM_PHONES)} scam phone numbers...")
+def seed_phones(gremlin_client):
+    log.info("📱 Seeding %d phone vertices...", len(SCAM_PHONES))
+    t0 = time.time()
+    queries = []
     for pid, number, state, operator in SCAM_PHONES:
         q = (
             "g.addV('Phone')"
@@ -186,52 +222,97 @@ def seed_phones():
             ".property('pk', 'phone')"
         )
         bindings = {"pid": pid, "number": number, "state": state, "operator": operator}
-        run(q, bindings)
-        print(f"  ✅ {number} ({state}, {operator})")
-        time.sleep(0.5)
+        queries.append((q, bindings))
+    run_batch(gremlin_client, queries)
+    log.info("   ✅ %d phone vertices seeded in %.1fs", len(SCAM_PHONES), time.time() - t0)
 
 
-def seed_links():
-    print(f"\n🔗 Creating {len(LINKS)} edges (phone → UPI links)...")
+def seed_links(gremlin_client):
+    log.info("🔗 Creating %d edges (phone → UPI)...", len(LINKS))
+    t0 = time.time()
+    queries = []
     for pid, uid, rel in LINKS:
         q = "g.V(pid).addE(rel).to(g.V(uid))"
         bindings = {"pid": pid, "uid": uid, "rel": rel}
-        run(q, bindings)
-        print(f"  ✅ {pid} → {uid}")
-        time.sleep(0.5)
+        queries.append((q, bindings))
+    run_batch(gremlin_client, queries)
+    log.info("   ✅ %d edges created in %.1fs", len(LINKS), time.time() - t0)
 
 
-def print_stats():
-    print("\n📊 Graph Statistics:")
-    v_count = gremlin.submitAsync("g.V().count()").result(timeout=QUERY_TIMEOUT)
-    e_count = gremlin.submitAsync("g.E().count()").result(timeout=QUERY_TIMEOUT)
-    print(f"  Vertices: {v_count}")
-    print(f"  Edges:    {e_count}")
-
-    print("\n🔍 Scam rings (phones controlling 2+ UPI IDs):")
-    rings = gremlin.submitAsync(
-        "g.V().hasLabel('Phone').where(out('OPERATED_BY').count().is(gte(2)))"
-        ".values('number')"
-    ).result(timeout=QUERY_TIMEOUT)
-    print(f"  {rings}")
+def print_stats(gremlin_client):
+    log.info("📊 Graph Statistics:")
+    t0 = time.time()
+    v_count = run(gremlin_client, "g.V().count()")
+    e_count = run(gremlin_client, "g.E().count()")
+    log.info("   Vertices: %s", v_count)
+    log.info("   Edges:    %s", e_count)
+    rings = run(
+        gremlin_client,
+        "g.V().hasLabel('Phone').where(out('OPERATED_BY').count().is(gte(2))).values('number')",
+    )
+    log.info("🔍 Scam rings (phones controlling 2+ UPI IDs): %s", rings)
+    log.info("   Stats fetched in %.1fs", time.time() - t0)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-if __name__ == "__main__":
-    print("🕸️  FraudShield India — Seeding Scam Network Graph")
-    print("=" * 55)
+def main():
+    log.info("🕸️  FraudShield India — Seeding Scam Network Graph")
+    log.info("=" * 55)
+    script_start = time.time()
 
+    COSMOS_ENDPOINT = os.environ.get("COSMOS_DB_ENDPOINT", "")
+    COSMOS_KEY = os.environ.get("COSMOS_DB_KEY", "")
+
+    log.info("ENDPOINT present: %s", bool(COSMOS_ENDPOINT))
+    log.info("KEY present: %s", bool(COSMOS_KEY))
+    if COSMOS_ENDPOINT:
+        log.info("ENDPOINT prefix: %s...", COSMOS_ENDPOINT[:30])
+
+    if not COSMOS_ENDPOINT or not COSMOS_KEY:
+        log.error("Available COSMOS env vars: %s", [k for k in os.environ if "COSMOS" in k.upper()])
+        log.error("❌ Set COSMOS_DB_ENDPOINT and COSMOS_DB_KEY in your .env file")
+        sys.exit(1)
+
+    COSMOS_ENDPOINT = (
+        COSMOS_ENDPOINT.replace("https://", "").replace("http://", "")
+        .rstrip("/").removesuffix(":443")
+    )
+
+    gremlin_client = None
     try:
-        drop_all()
-        seed_upis()
-        seed_phones()
-        seed_links()
-        print_stats()
-        print("\n✅ Graph seeded successfully!")
-        print("   View at: portal.azure.com → fraudshield-graphdb → Data Explorer")
-    except Exception as exc:
-        print(f"\n❌ Seed failed: {exc}")
+        gremlin_client = _build_client(COSMOS_ENDPOINT, COSMOS_KEY)
+
+        t0 = time.time()
+        drop_all(gremlin_client)
+        log.info("drop_all completed in %.1fs", time.time() - t0)
+
+        t0 = time.time()
+        seed_upis(gremlin_client)
+        log.info("seed_upis completed in %.1fs", time.time() - t0)
+
+        t0 = time.time()
+        seed_phones(gremlin_client)
+        log.info("seed_phones completed in %.1fs", time.time() - t0)
+
+        t0 = time.time()
+        seed_links(gremlin_client)
+        log.info("seed_links completed in %.1fs", time.time() - t0)
+
+        print_stats(gremlin_client)
+
+        log.info("✅ Graph seeded successfully in %.1fs total", time.time() - script_start)
+        log.info("   View at: portal.azure.com → fraudshield-graphdb → Data Explorer")
+
+    except Exception:
+        log.error("❌ Seed failed:\n%s", traceback.format_exc())
         sys.exit(1)
     finally:
-        gremlin.close()
+        if gremlin_client is not None:
+            log.info("Closing Gremlin client...")
+            gremlin_client.close()
+            log.info("Client closed.")
+
+
+if __name__ == "__main__":
+    main()
