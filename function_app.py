@@ -179,3 +179,136 @@ def batch_classify(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500,
             headers=cors_headers,
         )
+
+
+# ── /api/telegram ─────────────────────────────────────────────────────────────
+
+WELCOME_MSG = """🛡️ <b>FraudShield India में आपका स्वागत है!</b>
+
+मुझे कोई भी संदिग्ध SMS, WhatsApp, या ईमेल message भेजें — मैं तुरंत बताऊंगा कि यह <b>Scam है या नहीं</b>।
+
+<b>Send me any suspicious message to check if it's a scam!</b>
+
+🇮🇳 <i>Protecting India from digital fraud</i>"""
+
+
+SCAM_EMOJI = {
+    "fake_cashback": "💰",
+    "digital_arrest": "🚔",
+    "kyc_freeze": "🏦",
+    "job_scam": "💼",
+    "lottery_scam": "🎰",
+    "govt_impersonation": "🏛️",
+    "phishing_link": "🔗",
+    "legitimate": "✅",
+}
+
+
+def _format_telegram_result(result: dict) -> str:
+    is_scam: bool = result.get("is_scam", False)
+    category: str = result.get("category", "unknown")
+    confidence: float = result.get("confidence", 0.0)
+    explanation: str = result.get("explanation_hindi", "")
+    red_flags: list = result.get("red_flags", [])
+    complaint: dict = result.get("complaint_form", {})
+
+    emoji = SCAM_EMOJI.get(category, "⚠️")
+    conf_pct = int(confidence * 100)
+
+    if is_scam:
+        verdict = f"🚨 <b>SCAM DETECTED</b> — {emoji} {category.replace('_', ' ').title()}"
+    else:
+        verdict = "✅ <b>Message appears LEGITIMATE</b>"
+
+    lines = [
+        verdict,
+        f"📊 Confidence: <b>{conf_pct}%</b>",
+        "",
+        f"🗣️ <b>विवरण (Hindi):</b>",
+        f"<i>{explanation}</i>",
+    ]
+
+    if red_flags:
+        lines += ["", "🚩 <b>Red Flags:</b>"]
+        for flag in red_flags:
+            lines.append(f"  • {flag}")
+
+    if is_scam and complaint:
+        portal = complaint.get("portal", "cybercrime.gov.in")
+        helpline = complaint.get("helpline", "1930")
+        lines += [
+            "",
+            "📋 <b>Report करें (File Complaint):</b>",
+            f"  🌐 {portal}",
+            f"  📞 Helpline: <b>{helpline}</b>",
+        ]
+
+    lines += [
+        "",
+        "——————————————————",
+        "🛡️ <i>FraudShield India | MIT Manipal</i>",
+    ]
+
+    return "\n".join(lines)
+
+
+@app.route(route="telegram", methods=["POST"])
+def telegram_webhook(req: func.HttpRequest) -> func.HttpResponse:
+    """Telegram webhook endpoint — always returns 200 to avoid retries."""
+    import requests  # imported inline per requirements
+
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    api_url = os.getenv(
+        "FRAUDSHIELD_API_URL",
+        "https://fraudshield-api.azurewebsites.net/api/classify",
+    )
+
+    if not bot_token:
+        logging.error("TELEGRAM_BOT_TOKEN is not configured")
+        return func.HttpResponse("OK", status_code=200)
+
+    try:
+        update = req.get_json()
+        message = update.get("message") or update.get("edited_message")
+        if not message:
+            return func.HttpResponse("OK", status_code=200)
+
+        chat_id = message["chat"]["id"]
+        text = (message.get("text") or "").strip()
+
+        if not text:
+            return func.HttpResponse("OK", status_code=200)
+
+        # /start command
+        if text.startswith("/start"):
+            requests.post(
+                f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                json={"chat_id": chat_id, "text": WELCOME_MSG, "parse_mode": "HTML"},
+                timeout=10,
+            )
+            return func.HttpResponse("OK", status_code=200)
+
+        # All other text — classify via FraudShield API
+        try:
+            resp = requests.post(
+                api_url,
+                json={"message": text, "source": "telegram", "sender": "telegram_user"},
+                timeout=60,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+            reply = _format_telegram_result(result)
+        except Exception as classify_err:
+            logging.exception("Telegram classify error: %s", classify_err)
+            reply = "❌ <b>Analysis failed.</b> Please try again in a moment."
+
+        requests.post(
+            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+            json={"chat_id": chat_id, "text": reply, "parse_mode": "HTML"},
+            timeout=10,
+        )
+
+    except Exception as e:
+        logging.exception("Telegram webhook error: %s", e)
+
+    return func.HttpResponse("OK", status_code=200)
