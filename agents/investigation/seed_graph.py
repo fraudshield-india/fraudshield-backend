@@ -16,6 +16,7 @@ Env vars needed:
 """
 
 import os
+import sys
 import time
 from dotenv import load_dotenv
 
@@ -41,7 +42,7 @@ if not COSMOS_ENDPOINT or not COSMOS_KEY:
     print("❌ Set COSMOS_DB_ENDPOINT and COSMOS_DB_KEY in your .env file")
     exit(1)
 
-COSMOS_ENDPOINT = COSMOS_ENDPOINT.replace("https://", "").replace(":443/", "")
+COSMOS_ENDPOINT = COSMOS_ENDPOINT.replace("https://", "").replace("http://", "").rstrip("/").removesuffix(":443")
 print(f"🔌 Connecting to: {COSMOS_ENDPOINT}")
 
 gremlin = client.Client(
@@ -66,14 +67,17 @@ def drop_all():
     if os.environ.get("ENV", "").lower() == "production":
         print("❌ Refusing to drop graph in production environment. Unset ENV=production to proceed.")
         exit(1)
-    try:
-        confirm = input("⚠️  This will wipe ALL graph data. Type 'yes' to confirm: ")
-    except EOFError:
-        print("Aborted (non-interactive mode).")
-        exit(0)
-    if confirm.strip().lower() != "yes":
-        print("Aborted.")
-        exit(0)
+    if sys.stdin.isatty():
+        try:
+            confirm = input("⚠️  This will wipe ALL graph data. Type 'yes' to confirm: ")
+        except EOFError:
+            print("Aborted (non-interactive mode).")
+            exit(0)
+        if confirm.strip().lower() != "yes":
+            print("Aborted.")
+            exit(0)
+    else:
+        print("🤖 Non-interactive mode detected — skipping confirmation prompt.")
     print("🗑️  Clearing existing graph data...")
     run("g.V().drop()")
     time.sleep(2)
