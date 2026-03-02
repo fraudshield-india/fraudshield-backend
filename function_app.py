@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import requests
+import threading
 from openai import OpenAI
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
@@ -253,9 +254,56 @@ def _format_telegram_result(result: dict) -> str:
     return "\n".join(lines)
 
 
+def _send_telegram_message(bot_token: str, chat_id, text: str) -> None:
+    """Send a message to a Telegram chat."""
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+            timeout=10,
+        )
+    except Exception as e:
+        logging.error("Failed to send Telegram message to %s: %s", chat_id, e)
+
+
+def _process_telegram_update(bot_token: str, update: dict) -> None:
+    """Process a Telegram update in a background thread."""
+    try:
+        message = update.get("message") or update.get("edited_message")
+        if not message:
+            return
+
+        chat_id = message["chat"]["id"]
+        text = (message.get("text") or "").strip()
+
+        if not text:
+            return
+
+        # /start command
+        if text.startswith("/start"):
+            _send_telegram_message(bot_token, chat_id, WELCOME_MSG)
+            return
+
+        # Acknowledge receipt immediately so the user knows we're working
+        _send_telegram_message(bot_token, chat_id, "🔍 <i>Analyzing your message...</i>")
+
+        # Classify the message
+        try:
+            result = classify_message(text, "telegram", "telegram_user")
+            reply = _format_telegram_result(result)
+        except Exception as classify_err:
+            logging.exception("Telegram classify error: %s", classify_err)
+            reply = "❌ <b>Analysis failed.</b> Please try again in a moment."
+
+        _send_telegram_message(bot_token, chat_id, reply)
+
+    except Exception as e:
+        logging.exception("Telegram process error: %s", e)
+
+
 @app.route(route="telegram", methods=["POST"])
 def telegram_webhook(req: func.HttpRequest) -> func.HttpResponse:
-    """Telegram webhook endpoint — always returns 200 to avoid retries."""
+    """Telegram webhook endpoint — returns 200 immediately and processes async."""
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
     if not bot_token:
@@ -264,39 +312,8 @@ def telegram_webhook(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
         update = req.get_json()
-        message = update.get("message") or update.get("edited_message")
-        if not message:
-            return func.HttpResponse("OK", status_code=200)
-
-        chat_id = message["chat"]["id"]
-        text = (message.get("text") or "").strip()
-
-        if not text:
-            return func.HttpResponse("OK", status_code=200)
-
-        # /start command
-        if text.startswith("/start"):
-            requests.post(
-                f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                json={"chat_id": chat_id, "text": WELCOME_MSG, "parse_mode": "HTML"},
-                timeout=10,
-            )
-            return func.HttpResponse("OK", status_code=200)
-
-        # All other text — classify directly (no external HTTP hop)
-        try:
-            result = classify_message(text, "telegram", "telegram_user")
-            reply = _format_telegram_result(result)
-        except Exception as classify_err:
-            logging.exception("Telegram classify error: %s", classify_err)
-            reply = "❌ <b>Analysis failed.</b> Please try again in a moment."
-
-        requests.post(
-            f"https://api.telegram.org/bot{bot_token}/sendMessage",
-            json={"chat_id": chat_id, "text": reply, "parse_mode": "HTML"},
-            timeout=10,
-        )
-
+        # Fire-and-forget: respond to Telegram in <1 s, process in background
+        threading.Thread(target=_process_telegram_update, args=(bot_token, update)).start()
     except Exception as e:
         logging.exception("Telegram webhook error: %s", e)
 
