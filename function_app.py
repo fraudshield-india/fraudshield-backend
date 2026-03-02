@@ -10,19 +10,18 @@ app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 MODEL = "o4-mini"  # reasoning model — no temperature/response_format params
 _client: OpenAI | None = None
 
-
 def _get_client() -> OpenAI:
     """Return a cached OpenAI client; raises RuntimeError if GITHUB_TOKEN is unset."""
     global _client
     if _client is None:
-        token = os.environ.get("GITHUB_TOKEN")
+        token = os.getenv("GITHUB_TOKEN")
         if not token:
             raise RuntimeError(
                 "GITHUB_TOKEN application setting is not configured. "
                 "Add it in Azure Portal → Configuration → Application Settings."
             )
         _client = OpenAI(
-            base_url="https://models.inference.ai.azure.com",
+            base_url=os.getenv("OPENAI_BASE_URL", "https://models.inference.ai.azure.com"),
             api_key=token,
         )
     return _client
@@ -46,10 +45,9 @@ Respond ONLY with valid JSON in this exact schema:
   }
 }"""
 
-
 def classify_message(message: str, source: str = "unknown", sender: str = "unknown") -> dict:
     """Call GitHub Models (o4-mini) to classify a UPI fraud message."""
-    user_content = f"Source: {source}\nSender: {sender}\nMessage: {message}"
+    user_content = f"Source: {source}\nSender: {sender}\nMessage: {message}" 
 
     response = _get_client().chat.completions.create(
         model=MODEL,
@@ -63,7 +61,7 @@ def classify_message(message: str, source: str = "unknown", sender: str = "unkno
     # o4-mini may wrap output in ```json ... ``` — strip it just in case
     raw = response.choices[0].message.content.strip()
     if raw.startswith("```"):
-        raw = raw.split("```")[1]
+        raw = raw.split("```") [1]
         if raw.startswith("json"):
             raw = raw[4:]
     result = json.loads(raw.strip())
