@@ -2,16 +2,17 @@ import azure.functions as func
 import json
 import logging
 import os
+import re
 from openai import AzureOpenAI
+from gremlin_python.driver import client as gremlin_driver, serializer
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 # ── Azure OpenAI client (lazy-initialised to avoid startup crash) ─────────────
-MODEL = "o4-mini"  # reasoning model — no temperature/response_format params
+MODEL = "o4-mini"
 _client: AzureOpenAI | None = None
 
 def _get_client() -> AzureOpenAI:
-    """Return a cached AzureOpenAI client; raises RuntimeError if credentials are unset."""
     global _client
     if _client is None:
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
@@ -27,6 +28,7 @@ def _get_client() -> AzureOpenAI:
             api_version="2024-12-01-preview",
         )
     return _client
+
 
 SYSTEM_PROMPT = """You are FraudShield India, an expert UPI fraud detection system.
 Analyze messages for fraud patterns common in India. Classify into one of:
@@ -47,9 +49,52 @@ Respond ONLY with valid JSON in this exact schema:
   }
 }"""
 
+
+def lookup_graph(upi_id: str) -> dict:
+    """Look up a UPI ID in the Cosmos DB scam graph."""
+    try:
+        endpoint = os.getenv("COSMOS_DB_ENDPOINT", "")
+        key = os.getenv("COSMOS_DB_KEY", "")
+        if not endpoint or not key:
+            return {}
+        endpoint = (
+            endpoint.replace("wss://", "")
+            .replace("https://", "")
+            .replace(":443/", "")
+            .replace(":443", "")
+            .rstrip("/")
+        )
+        gc = gremlin_driver.Client(
+            f"wss://{endpoint}:443/", "g",
+            username="/dbs/FraudShieldDB/colls/ScamNetwork",
+            password=key,
+            message_serializer=serializer.GraphSONSerializersV2d0(),
+        )
+        result = gc.submitAsync(
+            "g.V().hasLabel('UpiId').has('vpa', vpa).valueMap()",
+            bindings={"vpa": upi_id}
+        ).result(timeout=10)
+        data = result.all().result()
+        gc.close()
+        if data:
+            v = data[0]
+            return {
+                "found_in_database": True,
+                "report_count": v.get("report_count", [0])[0],
+                "category": v.get("category", ["unknown"])[0],
+                "status": v.get("status", ["unknown"])[0],
+                "state": v.get("state", ["unknown"])[0],
+                "estimated_victims": v.get("estimated_victims", [0])[0],
+            }
+        return {"found_in_database": False}
+    except Exception as e:
+        logging.warning("Graph lookup failed: %s", e)
+        return {}
+
+
 def classify_message(message: str, source: str = "unknown", sender: str = "unknown") -> dict:
     """Call Azure OpenAI (o4-mini) to classify a UPI fraud message."""
-    user_content = f"Source: {source}\nSender: {sender}\nMessage: {message}" 
+    user_content = f"Source: {source}\nSender: {sender}\nMessage: {message}"
 
     response = _get_client().chat.completions.create(
         model=MODEL,
@@ -60,24 +105,30 @@ def classify_message(message: str, source: str = "unknown", sender: str = "unkno
         max_tokens=512,
     )
 
-    # o4-mini may wrap output in ```json ... ``` — strip it just in case
     raw = response.choices[0].message.content.strip()
     if raw.startswith("```"):
-        raw = raw.split("```") [1]
+        raw = raw.split("```")[1]
         if raw.startswith("json"):
             raw = raw[4:]
     result = json.loads(raw.strip())
     result["message"] = message
     result["source"] = source
     result["sender"] = sender
+
+    # ── INVESTIGATION: Cosmos DB graph lookup ──
+    if result.get("is_scam"):
+        upi_pattern = re.findall(r'[\w.\-]+@[\w]+', message)
+        if upi_pattern:
+            graph_data = lookup_graph(upi_pattern[0])
+            if graph_data:
+                result["graph_investigation"] = graph_data
+
     return result
 
 
 # ── /api/classify ─────────────────────────────────────────────────────────────
 @app.route(route="classify", methods=["POST", "OPTIONS"])
 def classify(req: func.HttpRequest) -> func.HttpResponse:
-    """Main fraud classification endpoint."""
-
     cors_headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -129,12 +180,14 @@ def classify(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="health", methods=["GET"])
 def health(req: func.HttpRequest) -> func.HttpResponse:
     azure_openai_configured = bool(os.environ.get("AZURE_OPENAI_ENDPOINT")) and bool(os.environ.get("AZURE_OPENAI_KEY"))
+    cosmos_configured = bool(os.environ.get("COSMOS_DB_ENDPOINT")) and bool(os.environ.get("COSMOS_DB_KEY"))
     return func.HttpResponse(
         json.dumps({
             "status": "ok",
             "service": "FraudShield India",
             "model": MODEL,
             "azure_openai_configured": azure_openai_configured,
+            "cosmos_db_configured": cosmos_configured,
         }),
         status_code=200,
         headers={"Content-Type": "application/json"},
@@ -144,7 +197,6 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
 # ── /api/batch ────────────────────────────────────────────────────────────────
 @app.route(route="batch", methods=["POST"])
 def batch_classify(req: func.HttpRequest) -> func.HttpResponse:
-    """Classify up to 20 messages in one call (used by evaluation script)."""
     cors_headers = {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
@@ -187,7 +239,7 @@ def batch_classify(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="telegram", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def telegram_webhook(req: func.HttpRequest) -> func.HttpResponse:
     import requests as req_lib
-    import os, logging, threading
+    import threading
 
     BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     API_URL = "https://fraudshield-api.azurewebsites.net/api/classify"
@@ -218,9 +270,12 @@ def telegram_webhook(req: func.HttpRequest) -> func.HttpResponse:
             confidence = int(result.get("confidence", 0) * 100)
             explanation = result.get("explanation_hindi") or result.get("explanation_hi", "")
             red_flags = result.get("red_flags", [])
+            graph = result.get("graph_investigation", {})
             verdict = f"🚨 <b>SCAM DETECTED</b> — {category.replace('_',' ').title()}" if is_scam else "✅ <b>LEGITIMATE MESSAGE</b>"
             flags = "\n".join(f"  • {f}" for f in red_flags) or "None"
             reply = f"{verdict}\n📊 Confidence: <b>{confidence}%</b>\n\n🗣️ <b>विवरण:</b>\n<i>{explanation}</i>\n\n🚩 <b>Red Flags:</b>\n{flags}"
+            if graph.get("found_in_database"):
+                reply += f"\n\n🔍 <b>Database Match:</b>\n  • Reports: {graph.get('report_count', 0)}\n  • Victims: ~{graph.get('estimated_victims', 0)}\n  • State: {graph.get('state', 'Unknown')}\n  • Status: {graph.get('status', 'Unknown')}"
             if is_scam:
                 reply += "\n\n📞 Report: <b>1930</b> | cybercrime.gov.in"
             send(chat_id, reply)
@@ -233,3 +288,4 @@ def telegram_webhook(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"webhook error: {e}")
     return func.HttpResponse("OK", status_code=200)
+
