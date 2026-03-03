@@ -5,6 +5,7 @@ import os
 import requests
 import threading
 from openai import OpenAI
+from agents.language_agent import analyze_message
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -168,8 +169,24 @@ def classify(req: func.HttpRequest) -> func.HttpResponse:
     sender = body.get("sender", "unknown")
 
     try:
+        # Pre-processing: Azure AI Language analysis
+        lang_analysis = {}
+        try:
+            lang_analysis = analyze_message(message)
+            logging.info("Language analysis: lang=%s, sentiment=%s",
+                         lang_analysis.get("detected_language", "unknown"),
+                         lang_analysis.get("sentiment", "unknown"))
+        except Exception as lang_exc:
+            logging.warning("Language analysis failed, skipping: %s", lang_exc)
+
         result = classify_message(message, source, sender)
         logging.info("Classified [%s] → %s (%.2f)", source, result.get("category"), result.get("confidence", 0))
+
+        # Merge language analysis into response
+        for key in ("detected_language", "language_confidence", "sentiment",
+                     "sentiment_scores", "extracted_evidence", "pii_entities"):
+            if key in lang_analysis:
+                result[key] = lang_analysis[key]
 
         # Response Agent: generate customized complaint if scam detected
         if result.get("is_scam") and result.get("confidence", 0) > 0.7:
@@ -196,6 +213,49 @@ def classify(req: func.HttpRequest) -> func.HttpResponse:
         logging.exception("Classification error: %s", exc)
         return func.HttpResponse(
             json.dumps({"error": "Classification failed", "detail": str(exc)}),
+            status_code=500,
+            headers=cors_headers,
+        )
+
+
+# ── /api/analyze ──────────────────────────────────────────────────────────────
+@app.route(route="analyze", methods=["POST"])
+def analyze(req: func.HttpRequest) -> func.HttpResponse:
+    """Run Azure AI Language analysis (language detection, PII, sentiment) without GPT classification."""
+    cors_headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Content-Type": "application/json",
+    }
+    try:
+        body = req.get_json()
+    except ValueError:
+        return func.HttpResponse(
+            json.dumps({"error": "Invalid JSON body"}),
+            status_code=400,
+            headers=cors_headers,
+        )
+
+    message = body.get("message", "").strip()
+    if not message:
+        return func.HttpResponse(
+            json.dumps({"error": "Field 'message' is required"}),
+            status_code=400,
+            headers=cors_headers,
+        )
+
+    try:
+        result = analyze_message(message)
+        return func.HttpResponse(
+            json.dumps(result, ensure_ascii=False),
+            status_code=200,
+            headers=cors_headers,
+        )
+    except Exception as exc:
+        logging.exception("Language analysis error: %s", exc)
+        return func.HttpResponse(
+            json.dumps({"error": "Language analysis failed", "detail": str(exc)}),
             status_code=500,
             headers=cors_headers,
         )
