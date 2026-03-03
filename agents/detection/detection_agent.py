@@ -41,7 +41,7 @@ def classify_message(message, language="auto"):
             {"role": "user", "content": f"Analyze (language: {language}): {message}"}
         ],
         temperature=0.1,
-        max_tokens=500
+        max_completion_tokens=500
     )
     text = response.choices[0].message.content
     text = text.replace("```json", "").replace("```", "").strip()
