@@ -299,8 +299,12 @@ def main():
         )
         sys.exit(1)
 
-    # Normalise endpoint: strip protocol, optional :443 or :443/ and trailing slash
-    cosmos_endpoint = cosmos_endpoint.replace("https://", "").replace("http://", "")
+    # Normalise endpoint: strip protocol (https/http/wss), optional :443 or :443/ and trailing slash
+    cosmos_endpoint = (
+        cosmos_endpoint.replace("https://", "")
+        .replace("http://", "")
+        .replace("wss://", "")
+    )
     cosmos_endpoint = cosmos_endpoint.replace(":443/", "").replace(":443", "").rstrip("/")
 
     gremlin_client = None
