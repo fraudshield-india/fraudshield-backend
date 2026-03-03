@@ -102,7 +102,7 @@ def classify_message(message: str, source: str = "unknown", sender: str = "unkno
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
-        max_tokens=512,
+        max_completion_tokens=512,
     )
 
     raw = response.choices[0].message.content.strip()
