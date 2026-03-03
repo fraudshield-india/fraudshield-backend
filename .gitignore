@@ -11,3 +11,4 @@ local.settings.json
 *.egg-info/
 dist/
 .DS_Store
+.pytest_cache/

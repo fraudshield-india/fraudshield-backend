@@ -41,13 +41,69 @@ Respond ONLY with valid JSON in this exact schema:
   "risk_level": "high/medium/low",
   "explanation_en": "<brief explanation in English>",
   "explanation_hi": "<brief explanation in Hindi>",
-  "red_flags": ["<flag1>", "<flag2>"],
-  "complaint_form": {
-    "portal": "cybercrime.gov.in",
-    "helpline": "1930",
-    "evidence_to_collect": ["screenshot", "sender_id", "transaction_id"]
-  }
+  "red_flags": ["<flag1>", "<flag2>"]
 }"""
+
+RESPONSE_AGENT_PROMPT = """You are FraudShield India's Response Agent. Given a scam classification result and the original message, generate a personalized complaint and action plan for the victim.
+
+Respond ONLY with valid JSON (no markdown, no backticks) in this exact schema:
+{
+  "complaint_category": "<specific NCRP category for this scam, e.g. 'Online Financial Fraud > Impersonation of Government Official'>",
+  "complaint_draft_en": "<2-3 sentence ready-to-file complaint in English including sender number and scam details>",
+  "complaint_draft_hi": "<same complaint in Hindi>",
+  "evidence_to_collect": ["<specific evidence item 1>", "<specific evidence item 2>"],
+  "immediate_steps": ["<step 1>", "<step 2>", "<step 3>", "<step 4>"],
+  "portal": "cybercrime.gov.in",
+  "helpline": "1930"
+}
+
+Use the scam category, message content, and sender info to make the response specific and actionable.
+Always include the sender number in complaint drafts.
+The immediate_steps should be 3-5 specific actionable steps relevant to this exact scam type.
+The evidence_to_collect should list specific items relevant to this scam type."""
+
+
+def _get_fallback_complaint_form(category: str, sender: str) -> dict:
+    """Return a basic hardcoded complaint form as fallback if the Response Agent fails."""
+    return {
+        "portal": "cybercrime.gov.in",
+        "helpline": "1930",
+        "complaint_category": "Online Financial Fraud",
+        "complaint_draft_en": f"I received a fraudulent message from {sender}. This appears to be a {category.replace('_', ' ')} scam. Please investigate.",
+        "complaint_draft_hi": f"मुझे {sender} से एक धोखाधड़ी संदेश प्राप्त हुआ। यह {category.replace('_', ' ')} घोटाला प्रतीत होता है। कृपया जांच करें।",
+        "evidence_to_collect": ["Screenshot of the message", "Sender phone number or ID", "Any transaction IDs if applicable"],
+        "immediate_steps": ["Do NOT share any OTP or personal information", "Block the sender immediately", "File complaint at cybercrime.gov.in", "Call 1930 national cybercrime helpline"],
+    }
+
+
+def generate_response_complaint(category: str, message: str, sender: str, red_flags: list) -> dict:
+    """Call the Response Agent (GPT-4o-mini) to generate a customized complaint and action plan."""
+    user_content = (
+        f"Scam Category: {category}\n"
+        f"Sender: {sender}\n"
+        f"Red Flags: {', '.join(red_flags)}\n"
+        f"Original Message: {message}"
+    )
+
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    response = _get_client().chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": RESPONSE_AGENT_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
+        temperature=0.1,
+        max_tokens=500,
+    )
+
+    raw = response.choices[0].message.content.strip()
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        if len(parts) >= 2:
+            raw = parts[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+    return json.loads(raw.strip())
 
 def classify_message(message: str, source: str = "unknown", sender: str = "unknown") -> dict:
     """Call GitHub Models (o4-mini) to classify a UPI fraud message."""
@@ -114,6 +170,23 @@ def classify(req: func.HttpRequest) -> func.HttpResponse:
     try:
         result = classify_message(message, source, sender)
         logging.info("Classified [%s] → %s (%.2f)", source, result.get("category"), result.get("confidence", 0))
+
+        # Response Agent: generate customized complaint if scam detected
+        if result.get("is_scam") and result.get("confidence", 0) > 0.7:
+            try:
+                complaint = generate_response_complaint(
+                    category=result.get("category", "unknown"),
+                    message=message,
+                    sender=sender,
+                    red_flags=result.get("red_flags", []),
+                )
+                result["complaint_form"] = complaint
+            except Exception as resp_exc:
+                logging.warning("Response Agent failed, using fallback: %s", resp_exc)
+                result["complaint_form"] = _get_fallback_complaint_form(
+                    result.get("category", "unknown"), sender
+                )
+
         return func.HttpResponse(
             json.dumps(result, ensure_ascii=False),
             status_code=200,
