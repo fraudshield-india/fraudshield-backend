@@ -11,692 +11,932 @@
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <style>
   :root {
-    --bg: #060810;
-    --surface: #0d1117;
-    --surface2: #161b22;
-    --border: #21262d;
-    --accent: #f97316;
-    --accent2: #ef4444;
-    --accent3: #22d3ee;
-    --text: #e6edf3;
-    --muted: #7d8590;
-    --green: #3fb950;
-    --yellow: #d29922;
+    --bg: #000000;
+    --indigo-deep: #0A0B14;
+    --accent: #007AFF;           /* SF Blue */
+    --accent-danger: #FF2D55;    /* Ruby Red */
+    --text: #F5F5F7;
+    --muted: #86868b;
+    --panel: rgba(28, 28, 30, 0.5);
+    --radius: 24px;
   }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 
   body {
-    background: radial-gradient(circle at top, #020617 0%, #020617 30%, #020617 40%, #020617 50%), radial-gradient(circle at top left, #0b1220 0%, #020617 45%), radial-gradient(circle at bottom right, #020617 0%, #000000 55%);
+    min-height: 100vh;
     color: var(--text);
     font-family: 'Syne', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
+    background:
+      radial-gradient(circle at center, var(--indigo-deep) 0%, #000000 60%),
+      #000000;
   }
 
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
-    pointer-events: none;
-    z-index: 9999;
+  .app {
+    padding: 40px;
   }
 
-  header {
+  .app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+  }
+
+  .logo {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 16px 28px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    background: rgba(13, 17, 23, 0.7);
-    backdrop-filter: blur(16px);
-    position: sticky;
-    top: 0;
-    z-index: 100;
+    gap: 12px;
   }
-
-  .logo { display: flex; align-items: center; gap: 12px; }
 
   .logo-shield {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px;
-    animation: pulse-shield 3s ease-in-out infinite;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    background: radial-gradient(circle at 20% 0%, rgba(255,255,255,0.5), transparent 55%),
+                linear-gradient(135deg, var(--accent), var(--accent-danger));
   }
 
-  @keyframes pulse-shield {
-    0%, 100% { filter: drop-shadow(0 0 4px var(--accent)); }
-    50% { filter: drop-shadow(0 0 12px var(--accent)); }
+  .logo-text {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
   }
-
-  .logo-text { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
   .logo-text span { color: var(--accent); }
 
-  .header-right { display: flex; align-items: center; gap: 20px; }
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+  }
 
   .live-badge {
-    display: flex; align-items: center; gap: 6px;
-    font-family: 'Space Mono', monospace; font-size: 11px;
-    color: var(--green); border: 1px solid var(--green);
-    padding: 4px 10px; border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    color: #30D158;
+    background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(24px);
   }
-
   .live-dot {
-    width: 6px; height: 6px; background: var(--green);
-    border-radius: 50%; animation: blink 1.2s ease-in-out infinite;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #30D158;
   }
 
-  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
-
-  .header-stat { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); text-align: right; }
-  .header-stat strong { display: block; font-size: 16px; color: var(--accent); }
-
-  .layout {
-    display: grid;
-    grid-template-columns: 1fr 340px;
-    grid-template-rows: auto 1fr;
-    gap: 0;
-    height: calc(100vh - 69px);
+  .api-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(24px);
+  }
+  .api-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
   }
 
-  .stats-bar {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    border-bottom: 1px solid var(--border);
+  .header-stat {
+    text-align: right;
+    color: var(--muted);
+  }
+  .header-stat strong {
+    display: block;
+    font-size: 16px;
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
   }
 
-  .stat-card {
-    padding: 14px 20px;
+  .app-main {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  /* Hero Scam of the Day Stage */
+  .hero-stage {
+    padding: 32px 40px;
+    border-radius: var(--radius);
+    background:
+      radial-gradient(circle, rgba(255,45,85,0.08) 0%, transparent 70%);
     position: relative;
     overflow: hidden;
-    transition: background 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(25px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 18px;
+    text-align: center;
   }
-  .stat-card::after {
-    content: '';
+
+  .hero-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent-danger);
+    margin-bottom: 8px;
+  }
+
+  .hero-title {
+    font-size: 48px;
+    font-weight: 700;
+    letter-spacing: -0.05em;
+    margin-bottom: 16px;
+  }
+
+  .hero-message {
+    max-width: 720px;
+    margin: 0 auto 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .hero-metrics {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .hero-metric strong {
+    display: block;
+    font-size: 16px;
+    color: var(--accent-danger);
+    margin-bottom: 2px;
+  }
+
+  /* Main layer: stats + map */
+  .layer-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1.4fr;
+    gap: 32px;
+  }
+
+  .panel {
+    background: var(--panel);
+    backdrop-filter: blur(50px);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    border-top: 0.5px solid rgba(255,255,255,0.1);
+    border-left: 0.5px solid rgba(255,255,255,0.08);
+  }
+
+  .stats-panel {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .stat-total-block {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .stat-total-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--muted);
+  }
+  #stat-total {
+    font-size: 64px;
+    font-weight: 700;
+    letter-spacing: -0.08em;
+    color: var(--accent-danger);
+  }
+
+  .stat-row-small {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 12px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .stat-small-label {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 2px;
+  }
+  .stat-small-value {
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  .map-panel {
+    position: relative;
+    padding: 0;
+    overflow: hidden;
+  }
+  .map-shell {
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  #map {
+    width: 100%;
+    height: 320px;
+  }
+  .map-controls {
     position: absolute;
-    inset: 0;
-    pointer-events: none;
-    border-radius: inherit;
-    border: 1px solid rgba(255, 255, 255, 0.03);
+    inset: auto 24px 20px 24px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
   }
-  .stat-card:hover {
-    background: rgba(255, 255, 255, 0.05);
-    box-shadow: 0 18px 45px rgba(15,23,42,0.85);
-    transform: translateY(-1px);
-  }
-
-  .stat-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; font-family: 'Space Mono', monospace; margin-bottom: 4px; }
-  .stat-value { font-size: 24px; font-weight: 800; color: var(--text); line-height: 1; }
-  .stat-value.red { color: var(--accent2); }
-  .stat-value.orange { color: var(--accent); }
-  .stat-value.cyan { color: var(--accent3); }
-  .stat-value.green { color: var(--green); }
-  .stat-sub { font-size: 10px; color: var(--muted); margin-top: 2px; font-family: 'Space Mono', monospace; }
-
-  .map-container { position: relative; overflow: hidden; border-radius: 18px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 20px 40px rgba(0,0,0,0.65); }
-  #map { width: 100%; height: 100%; background: #0a0e14; }
-
-  .map-overlay {
-    position: absolute; top: 16px; left: 16px; z-index: 500;
-    display: flex; flex-direction: column; gap: 8px;
-  }
-
   .map-btn {
-    background: rgba(13,17,23,0.92); border: 1px solid var(--border);
-    color: var(--text); padding: 8px 14px;
-    font-family: 'Space Mono', monospace; font-size: 11px;
-    cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px;
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    border: none;
+    background: rgba(0,0,0,0.7);
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
   }
-  .map-btn:hover, .map-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
-
-  @keyframes button-shimmer {
-    0% { background-position: -120% 0; }
-    100% { background-position: 220% 0; }
-  }
-
-  .map-btn:hover {
-    background-image: linear-gradient(120deg, rgba(255,255,255,0.25), rgba(249,115,22,0.6), rgba(255,255,255,0.25));
-    background-size: 250% 100%;
-    animation: button-shimmer 1.6s linear infinite;
+  .map-btn.active {
+    background: var(--accent);
+    color: #000;
   }
 
   .map-legend {
-    position: absolute; bottom: 24px; left: 16px; z-index: 500;
-    background: rgba(13,17,23,0.92); border: 1px solid var(--border);
-    padding: 12px 16px; font-family: 'Space Mono', monospace; font-size: 10px;
-  }
-  .legend-title { color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
-  .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; color: var(--text); }
-  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
-
-  .sidebar {
-    border-left: 1px solid rgba(255,255,255,0.12);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(25px);
-    border-radius: 18px;
-  }
-
-  .sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); }
-
-  .tab {
-    flex: 1; padding: 12px; font-size: 11px;
-    font-family: 'Space Mono', monospace; letter-spacing: 0.5px;
-    text-transform: uppercase; color: var(--muted);
-    background: none; border: none; cursor: pointer;
-    border-bottom: 2px solid transparent; transition: all 0.2s;
-  }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--surface); }
-
-  .tab-content { display: none; flex: 1; overflow-y: auto; }
-  .tab-content.active { display: flex; flex-direction: column; }
-
-  .feed-item {
-    padding: 12px 16px;
-    border-bottom: 1px solid transparent;
-    transition: background 0.15s, box-shadow 0.25s, transform 0.15s;
-    cursor: pointer; animation: slide-in 0.3s ease;
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(25px);
-    border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-  }
-  @keyframes slide-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-  .feed-item:hover {
-    background: rgba(255, 255, 255, 0.06);
-    box-shadow: 0 18px 40px rgba(15,23,42,0.85);
-    transform: translateY(-1px);
-  }
-
-  .feed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-  .feed-category {
-    font-size: 10px; font-family: 'Space Mono', monospace;
-    padding: 2px 8px; border-radius: 2px; font-weight: 700; letter-spacing: 0.5px;
-  }
-  .cat-fake_cashback     { background: rgba(249,115,22,0.2); color: var(--accent); }
-  .cat-digital_arrest    { background: rgba(239,68,68,0.2);  color: var(--accent2); }
-  .cat-kyc_freeze        { background: rgba(34,211,238,0.2); color: var(--accent3); }
-  .cat-job_scam          { background: rgba(210,153,34,0.2); color: var(--yellow); }
-  .cat-lottery_scam      { background: rgba(63,185,80,0.2);  color: var(--green); }
-  .cat-govt_impersonation{ background: rgba(139,92,246,0.2); color: #a78bfa; }
-  .cat-phishing_link     { background: rgba(239,68,68,0.15); color: #f87171; }
-  .cat-legitimate        { background: rgba(63,185,80,0.2);  color: var(--green); }
-
-  .feed-time { font-size: 10px; font-family: 'Space Mono', monospace; color: var(--muted); }
-  .feed-location { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
-  .feed-location strong { color: var(--text); }
-  .feed-upi { font-size: 11px; font-family: 'Space Mono', monospace; color: var(--accent2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .feed-conf { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-  .conf-bar { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
-  .conf-fill { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 2px; }
-  .conf-pct { font-size: 10px; font-family: 'Space Mono', monospace; color: var(--muted); min-width: 30px; text-align: right; }
-
-  #network-canvas { width: 100%; flex: 1; background: var(--surface); }
-  .network-legend { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 12px; flex-wrap: wrap; }
-  .net-legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; font-family: 'Space Mono', monospace; color: var(--muted); }
-  .net-dot { width: 8px; height: 8px; border-radius: 50%; }
-
-  ::-webkit-scrollbar { width: 3px; height: 3px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, var(--accent3), var(--accent));
-    border-radius: 999px;
-    box-shadow: 0 0 10px rgba(34,211,238,0.7);
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, var(--accent3), var(--accent2));
-  }
-
-  .leaflet-container { background: #0a0e14 !important; }
-  .leaflet-tile { filter: brightness(0.4) saturate(0.3) hue-rotate(200deg); }
-  .leaflet-control-zoom a { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
-  .leaflet-control-attribution { display: none; }
-  .scam-tooltip {
-    background: rgba(13,17,23,0.95) !important; border: 1px solid var(--border) !important;
-    color: var(--text) !important; font-family: 'Space Mono', monospace !important;
-    font-size: 11px !important; border-radius: 0 !important;
-    padding: 8px 12px !important; box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
-  }
-
-  /* ── API Status ── */
-  .api-status {
-    display: flex; align-items: center; gap: 6px;
-    font-family: 'Space Mono', monospace; font-size: 11px;
-    padding: 4px 10px; border-radius: 20px;
-    border: 1px solid var(--border); transition: all 0.4s;
-  }
-  .api-status.online { color: var(--green); border-color: var(--green); }
-  .api-status.offline { color: var(--accent2); border-color: var(--accent2); }
-  .api-status.checking { color: var(--muted); border-color: var(--border); }
-  .api-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-  .api-status.online .api-dot { animation: blink 1.2s ease-in-out infinite; }
-
-  /* ── Scam of the Day ── */
-  .sotd-banner {
-    grid-column: 1 / -1;
-    display: flex; align-items: center; gap: 16px;
-    padding: 14px 28px;
-    background: rgba(239, 68, 68, 0.15);
-    backdrop-filter: blur(25px);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 18px;
-    position: relative; overflow: hidden;
-    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.2);
-  }
-  .sotd-banner::before {
-    content: '';
-    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-    background: linear-gradient(180deg, var(--accent2), var(--accent));
-  }
-  .sotd-label {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    font-family: 'Space Mono', monospace; font-size: 10px;
-    letter-spacing: 1.5px; text-transform: uppercase;
-    color: var(--accent2); white-space: nowrap; font-weight: 700;
-    animation: sotd-blink 2.6s ease-in-out infinite;
-  }
-
-  .sotd-critical-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 999px;
-    background: radial-gradient(circle at center, #fecaca 0%, #ef4444 40%, #7f1d1d 100%);
-    box-shadow: 0 0 16px rgba(239,68,68,0.7);
-    font-size: 11px;
-    animation: critical-pulse 1.5s ease-in-out infinite;
-  }
-
-  @keyframes critical-pulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.12); opacity: 0.8; }
-  }
-  .sotd-divider { width: 1px; height: 28px; background: var(--border); }
-  .sotd-content { flex: 1; min-width: 0; }
-  .sotd-title { font-size: 13px; font-weight: 800; color: #ffffff; margin-bottom: 2px; font-family: 'Syne', sans-serif; letter-spacing: -0.02em; }
-  .sotd-msg {
-    font-size: 11px; font-family: 'Space Mono', monospace;
-    color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    font-weight: 700;
-  }
-  .sotd-stats { display: flex; gap: 16px; white-space: nowrap; }
-  .sotd-stat { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); text-align: center; }
-  .sotd-stat strong { display: block; font-size: 14px; color: var(--accent2); }
-
-  @keyframes sotd-blink {
-    0%, 90%, 100% { opacity: 1; }
-    45%, 55% { opacity: 0.45; }
-  }
-
-  /* ── Map test pin pulse ── */
-  @keyframes pin-pulse {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(2.5); opacity: 0; }
-    100% { transform: scale(1); opacity: 0; }
-  }
-
-  /* ── LIVE TESTER ── */
-  .tester-section {
-    grid-column: 1 / -1;
-    padding: 24px 28px;
-    border-top: 1px solid rgba(255,255,255,0.12);
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(25px);
-    border-radius: 18px 18px 0 0;
-    border: 1px solid rgba(255,255,255,0.12);
-  }
-
-  .tester-header {
-    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
-  }
-
-  .tester-badge {
-    font-family: 'Space Mono', monospace; font-size: 10px;
-    letter-spacing: 1.5px; text-transform: uppercase;
-    color: var(--accent); border: 1px solid var(--accent);
-    padding: 3px 10px; border-radius: 2px;
-  }
-
-  .tester-title { font-size: 16px; font-weight: 800; font-family: 'Syne', sans-serif; letter-spacing: -0.02em; }
-  .tester-sub { font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; }
-
-  .tester-grid { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; }
-
-  .tester-input-wrap {
-    position: relative;
-    background: radial-gradient(circle at top left, rgba(34,211,238,0.12), rgba(6,8,16,0.95));
-    border-radius: 10px;
-    padding: 1px;
-    overflow: hidden;
-  }
-
-  .tester-textarea {
-    width: 100%;
-    background:
-      linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.03) 0px,
-        rgba(255,255,255,0.03) 1px,
-        rgba(0,0,0,0.0) 2px,
-        rgba(0,0,0,0.0) 4px
-      ),
-      #050711;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 9px;
-    color: var(--text); font-family: 'Space Mono', monospace; font-size: 12px;
-    padding: 14px 16px; resize: none; height: 72px; outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    caret-color: var(--accent3);
-  }
-  .tester-textarea:focus {
-    border-color: var(--accent3);
-    box-shadow: 0 0 0 1px rgba(34,211,238,0.4), 0 0 26px rgba(34,211,238,0.35);
-  }
-  .tester-textarea::placeholder { color: var(--muted); }
-
-  .tester-input-wrap::after {
-    content: "";
     position: absolute;
-    top: 14px;
-    right: 14px;
-    width: 2px;
-    height: calc(100% - 32px);
-    background: var(--accent3);
-    box-shadow: 0 0 10px rgba(34,211,238,0.9);
-    opacity: 0;
-    pointer-events: none;
-    animation: cursor-blink 1s steps(2, start) infinite;
+    left: 24px;
+    bottom: 24px;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    background: rgba(0,0,0,0.75);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+  }
+  .legend-title {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
   }
 
-  .tester-input-wrap:focus-within::after {
-    opacity: 1;
+  /* Second layer: feed, tabs, tester */
+  .lower-layer {
+    display: grid;
+    grid-template-columns: 1.4fr 1.2fr;
+    gap: 32px;
   }
 
-  .tester-examples {
-    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;
+  .feed-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
   }
 
-  .example-chip {
-    font-family: 'Space Mono', monospace; font-size: 10px;
-    color: var(--muted); border: 1px solid var(--border);
-    padding: 4px 10px; cursor: pointer; transition: all 0.15s;
-    border-radius: 2px;
-  }
-  .example-chip:hover { border-color: var(--accent); color: var(--accent); }
-
-  .tester-btn {
-    background: var(--accent); color: #000; font-family: 'Space Mono', monospace;
-    font-size: 12px; font-weight: 700; letter-spacing: 1px;
-    border: none; padding: 14px 24px; cursor: pointer;
-    transition: all 0.2s; white-space: nowrap; height: 72px;
-    background-image: linear-gradient(120deg, rgba(255,255,255,0.2), rgba(249,115,22,0.9), rgba(255,255,255,0.2));
-    background-size: 220% 100%;
-  }
-  .tester-btn:hover {
-    background-color: #fb923c;
-    animation: button-shimmer 1.4s linear infinite;
-  }
-  .tester-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
-
-  .tester-result {
-    margin-top: 16px; padding: 16px;
-    border: 1px solid var(--border); background: var(--surface);
-    display: none; animation: slide-in 0.3s ease;
-  }
-
-  .tester-result.visible { display: block; }
-
-  .result-verdict {
-    font-size: 18px; font-weight: 800; margin-bottom: 12px;
-    display: flex; align-items: center; gap: 10px;
-  }
-
-  .result-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  .feed-meta {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
     margin-bottom: 12px;
   }
 
-  .result-field { }
-  .result-label { font-size: 10px; color: var(--muted); font-family: 'Space Mono', monospace; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
-  .result-value { font-size: 13px; font-weight: 600; }
-
-  .result-hindi {
-    font-size: 13px; color: var(--text); padding: 10px 14px;
-    background: var(--surface2); border-left: 3px solid var(--accent);
-    margin-bottom: 12px; line-height: 1.6;
-  }
-
-  .result-flags { display: flex; flex-wrap: wrap; gap: 6px; }
-  .result-flag {
-    font-size: 10px; font-family: 'Space Mono', monospace;
-    padding: 3px 8px; background: rgba(239,68,68,0.15);
-    color: #f87171; border: 1px solid rgba(239,68,68,0.3);
-  }
-
-  .result-report {
-    margin-top: 10px; padding: 8px 12px;
-    background: rgba(63,185,80,0.1); border: 1px solid rgba(63,185,80,0.3);
-    font-size: 11px; font-family: 'Space Mono', monospace; color: var(--green);
-  }
-
-  .tester-loading {
-    display: none; align-items: center; gap: 10px;
-    margin-top: 16px; font-family: 'Space Mono', monospace;
-    font-size: 12px; color: var(--muted);
-  }
-  .tester-loading.visible { display: flex; }
-
-  .loading-dots span {
-    display: inline-block; width: 6px; height: 6px;
-    background: var(--accent); border-radius: 50%; margin: 0 2px;
-    animation: dot-bounce 1.2s ease-in-out infinite;
-  }
-  .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
-  .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes dot-bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
-
-  /* ── Evolution section ── */
-  .evolution-section {
-    margin: 0; padding: 20px 28px;
-    border-top: 1px solid rgba(255,255,255,0.12);
-    background: radial-gradient(circle at top left, rgba(249,115,22,0.08), transparent 55%);
-    border-radius: 0 0 18px 18px;
-    border: 1px solid rgba(255,255,255,0.12);
-    border-top: none;
-  }
-
-  .evolution-title { font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-  .evolution-heading { font-size: 20px; font-weight: 800; margin-bottom: 10px; font-family: 'Syne', sans-serif; letter-spacing: -0.02em; }
-  .evolution-sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; font-family: 'Space Mono', monospace; }
-
-  .evolution-table { width: 100%; border-collapse: collapse; font-family: 'Space Mono', monospace; font-size: 11px; }
-  .evolution-table th, .evolution-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
-  .evolution-table th { color: var(--muted); font-weight: 400; text-transform: uppercase; letter-spacing: 0.8px; font-size: 10px; }
-  .evolution-row-high { background: rgba(249,115,22,0.08); }
-  .evolution-score-high { color: var(--accent); }
-  .evolution-bar { position: relative; width: 180px; height: 6px; background: var(--border); border-radius: 999px; overflow: hidden; }
-  .evolution-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
-  .evolution-bar-fill.low { background: linear-gradient(90deg, #22d3ee, var(--accent3)); }
-  .evolution-footnote { margin-top: 10px; font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; }
-
-  /* Make layout scrollable for tester + evolution */
-  .main-content {
-    display: grid;
-    grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
-    grid-template-rows: auto 1fr;
-    gap: 24px;
-    padding: 24px;
-    height: calc(100vh - 69px);
+  #tab-feed {
+    max-height: 260px;
     overflow-y: auto;
   }
 
-  .bottom-sections {
-    grid-column: 1 / -1;
-    border-top: 1px solid var(--border);
+  .feed-item {
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.16s ease;
+    margin-bottom: 6px;
+  }
+  .feed-item:hover {
+    background: rgba(255,255,255,0.04);
+  }
+  .feed-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .feed-category {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: var(--radius);
+  }
+  .cat-fake_cashback,
+  .cat-kyc_freeze,
+  .cat-job_scam,
+  .cat-govt_impersonation {
+    background: rgba(0,122,255,0.18);
+    color: var(--accent);
+  }
+  .cat-digital_arrest,
+  .cat-phishing_link {
+    background: rgba(255,45,85,0.16);
+    color: var(--accent-danger);
+  }
+  .cat-lottery_scam,
+  .cat-legitimate {
+    background: rgba(48,209,88,0.16);
+    color: #30D158;
+  }
+
+  .feed-time,
+  .feed-location,
+  .feed-upi {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .feed-location strong {
+    color: var(--text);
+  }
+
+  .feed-conf {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .conf-bar {
+    flex: 1;
+    height: 3px;
+    border-radius: var(--radius);
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+  }
+  .conf-fill {
+    height: 100%;
+    border-radius: var(--radius);
+    background: linear-gradient(90deg, var(--accent-danger), var(--accent));
+  }
+  .conf-pct {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .right-column {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .tabs-panel {
+    padding-bottom: 0;
+  }
+
+  .sidebar-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .tab {
+    flex: 1;
+    border-radius: var(--radius);
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 8px 10px;
+    cursor: pointer;
+  }
+  .tab.active {
+    background: rgba(255,255,255,0.08);
+    color: var(--accent);
+  }
+
+  .tab-content {
+    display: none;
+    padding-bottom: 16px;
+  }
+  .tab-content.active {
+    display: block;
+  }
+
+  #network-canvas {
+    width: 100%;
+    height: 220px;
+    border-radius: var(--radius);
+    background: #05060A;
+  }
+
+  /* Tester */
+  .tester-section {
+    padding: 20px 22px;
+  }
+  .tester-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .tester-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    background: rgba(0,0,0,0.8);
+    color: var(--accent);
+  }
+  .tester-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .tester-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .tester-grid {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .tester-input-wrap {
+    flex: 1;
+  }
+  .tester-textarea {
+    width: 100%;
+    height: 48px;
+    border-radius: var(--radius);
+    border: none;
+    padding: 12px 14px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    background: rgba(5,5,7,0.9);
+  }
+  .tester-textarea::placeholder {
+    color: var(--muted);
+  }
+
+  .tester-btn {
+    border-radius: var(--radius);
+    border: none;
+    padding: 12px 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    background: var(--accent);
+    color: #000;
+    cursor: pointer;
+  }
+
+  .tester-examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .example-chip {
+    border-radius: var(--radius);
+    padding: 4px 10px;
+    border: none;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    background: rgba(255,255,255,0.04);
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .tester-result {
+    margin-top: 10px;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    background: rgba(0,0,0,0.8);
+    display: none;
+  }
+  .tester-result.visible {
+    display: block;
+  }
+
+  .tester-loading {
+    display: none;
+    margin-top: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    gap: 8px;
+    align-items: center;
+  }
+  .tester-loading.visible {
+    display: flex;
+  }
+
+  /* Evolution list */
+  .evolution-section {
+    padding: 22px 24px;
+  }
+  .evolution-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .evolution-heading {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .evolution-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .evolution-cards {
+    margin-top: 14px;
+    display: grid;
+    gap: 10px;
+  }
+  .evo-card {
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.03);
+  }
+  .evo-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: baseline;
+  }
+  .evo-pair {
+    font-size: 14px;
+    letter-spacing: -0.02em;
+  }
+  .evo-pair span {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .evo-score {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .evo-score strong {
+    color: var(--accent);
+  }
+  .evo-meta {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .evo-overlap {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .evolution-bar {
+    position: relative;
+    width: 180px;
+    height: 6px;
+    border-radius: var(--radius);
+    background: rgba(255,255,255,0.08);
+    overflow: hidden;
+  }
+  .evolution-bar-fill {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius);
+    background: linear-gradient(90deg, var(--accent), var(--accent-danger));
+  }
+  .evolution-bar-fill.low {
+    background: linear-gradient(90deg, rgba(0,122,255,0.7), rgba(0,122,255,0.4));
+  }
+
+  /* Leaflet overrides */
+  .leaflet-container {
+    background: #000000 !important;
+  }
+  .leaflet-tile {
+    filter: grayscale(1);
+  }
+
+  @media (max-width: 1200px) {
+    .layer-row,
+    .lower-layer {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">
-    <div class="logo-shield">🛡</div>
-    <div>
-      <div class="logo-text">Fraud<span>Shield</span> India</div>
-      <div style="font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:1px;">THREAT INTELLIGENCE DASHBOARD</div>
-    </div>
-  </div>
-  <div class="header-right">
-    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
-    <div id="api-status" class="api-status checking"><div class="api-dot"></div><span id="api-status-text">CHECKING...</span></div>
-    <div class="header-stat"><strong id="total-counter">0</strong>scams today</div>
-    <div class="header-stat"><strong id="blocked-counter">0</strong>blocked</div>
-    <div style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;">MIT Manipal · AI Unlocked 2025</div>
-  </div>
-</header>
-
-<div class="main-content">
-  <!-- Stats Bar -->
-  <div class="stats-bar">
-    <div class="stat-card"><div class="stat-label">Total Scams</div><div class="stat-value red" id="stat-total">2,847</div><div class="stat-sub">↑ 12% this week</div></div>
-    <div class="stat-card"><div class="stat-label">Digital Arrest</div><div class="stat-value orange" id="stat-arrest">634</div><div class="stat-sub">Highest risk</div></div>
-    <div class="stat-card"><div class="stat-label">Fake Cashback</div><div class="stat-value orange" id="stat-cashback">891</div><div class="stat-sub">Most common</div></div>
-    <div class="stat-card"><div class="stat-label">KYC Freeze</div><div class="stat-value cyan" id="stat-kyc">421</div><div class="stat-sub">↑ 34% this month</div></div>
-    <div class="stat-card"><div class="stat-label">Amount Saved</div><div class="stat-value green">₹4.2Cr</div><div class="stat-sub">Est. prevented loss</div></div>
-    <div class="stat-card"><div class="stat-label">Accuracy</div><div class="stat-value green">96.4%</div><div class="stat-sub">Azure o4-mini model</div></div>
-  </div>
-
-  <!-- Scam of the Day Banner -->
-  <div class="sotd-banner">
-      <div class="sotd-label">
-        <span class="sotd-critical-icon">!</span>
-        <span>Scam of<br>the Day</span>
-      </div>
-    <div class="sotd-divider"></div>
-    <div class="sotd-content">
-      <div class="sotd-title" id="sotd-title">Digital Arrest Scam — Most Dangerous Today</div>
-      <div class="sotd-msg" id="sotd-msg">"CBI officer here. Your Aadhaar linked to money laundering. Transfer Rs.50,000 or face arrest immediately."</div>
-    </div>
-    <div class="sotd-divider"></div>
-    <div class="sotd-stats">
-      <div class="sotd-stat"><strong id="sotd-count">634</strong>reports today</div>
-      <div class="sotd-stat"><strong>99%</strong>confidence</div>
-      <div class="sotd-stat"><strong>₹1.2Cr</strong>avg loss</div>
-    </div>
-  </div>
-
-  <!-- Map -->
-  <div class="map-container">
-    <div id="map"></div>
-    <div class="map-overlay">
-      <button class="map-btn active" onclick="setLayer('heat')">HEATMAP</button>
-      <button class="map-btn" onclick="setLayer('markers')">MARKERS</button>
-      <button class="map-btn" onclick="setLayer('both')">BOTH</button>
-    </div>
-    <div class="map-legend">
-      <div class="legend-title">Scam Intensity</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Critical (50+)</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>High (20-50)</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#eab308"></div>Medium (5-20)</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#22d3ee"></div>Low (&lt;5)</div>
-    </div>
-  </div>
-
-  <!-- Sidebar -->
-  <div class="sidebar">
-    <div class="sidebar-tabs">
-      <button class="tab active" onclick="switchTab('feed', this)">LIVE FEED</button>
-      <button class="tab" onclick="switchTab('network', this)">NETWORK</button>
-      <button class="tab" onclick="switchTab('stats', this)">CATEGORY</button>
-    </div>
-    <div class="tab-content active" id="tab-feed"></div>
-    <div class="tab-content" id="tab-network">
-      <canvas id="network-canvas"></canvas>
-      <div class="network-legend">
-        <div class="net-legend-item"><div class="net-dot" style="background:#ef4444"></div>UPI ID</div>
-        <div class="net-legend-item"><div class="net-dot" style="background:#22d3ee"></div>Phone</div>
-        <div class="net-legend-item"><div class="net-dot" style="background:#f97316"></div>Ring</div>
-      </div>
-    </div>
-    <div class="tab-content" id="tab-stats" style="padding:16px;gap:8px;"></div>
-  </div>
-
-  <!-- Bottom sections -->
-  <div class="bottom-sections">
-
-    <!-- ── LIVE TESTER ── -->
-    <div class="tester-section">
-      <div class="tester-header">
-        <div class="tester-badge">⚡ LIVE</div>
-        <div>
-          <div class="tester-title">Real-Time Scam Analyzer</div>
-          <div class="tester-sub">Powered by Azure OpenAI o4-mini · Test any SMS message instantly</div>
+<div class="app">
+  <header class="app-header">
+    <div class="logo">
+      <div class="logo-shield">🛡</div>
+      <div>
+        <div class="logo-text">Fraud<span>Shield</span> India</div>
+        <div style="font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:0.16em;text-transform:uppercase;">
+          Threat Intelligence Dashboard
         </div>
       </div>
+    </div>
+    <div class="header-meta">
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        LIVE
+      </div>
+      <div id="api-status" class="api-status checking">
+        <div class="api-dot"></div>
+        <span id="api-status-text">CHECKING...</span>
+      </div>
+      <div class="header-stat">
+        <strong id="total-counter">0</strong>
+        scams today
+      </div>
+      <div class="header-stat">
+        <strong id="blocked-counter">0</strong>
+        blocked
+      </div>
+      <div style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;">
+        MIT Manipal · AI Unlocked 2025
+      </div>
+    </div>
+  </header>
 
-      <div class="tester-grid">
-        <div class="tester-input-wrap">
-          <textarea
-            class="tester-textarea"
-            id="tester-input"
-            placeholder="Paste any suspicious SMS here... e.g. 'Google Pay se aapko Rs.1500 cashback mila hai...'"
-          ></textarea>
-          <div class="tester-examples">
-            <span class="example-chip" onclick="fillExample('cashback')">💸 Fake Cashback</span>
-            <span class="example-chip" onclick="fillExample('arrest')">🚔 Digital Arrest</span>
-            <span class="example-chip" onclick="fillExample('kyc')">🏦 KYC Freeze</span>
-            <span class="example-chip" onclick="fillExample('job')">💼 Job Scam</span>
-            <span class="example-chip" onclick="fillExample('legit')">✅ Legitimate</span>
+  <main class="app-main">
+    <!-- Hero Scam of the Day -->
+    <section class="hero-stage">
+      <div class="hero-label">Scam of the Day</div>
+      <h1 class="hero-title" id="sotd-title">Digital Arrest Scam — Most Dangerous Today</h1>
+      <p class="hero-message" id="sotd-msg">
+        "CBI officer here. Your Aadhaar linked to money laundering. Transfer Rs.50,000 or face arrest immediately."
+      </p>
+      <div class="hero-metrics">
+        <div class="hero-metric">
+          <strong id="sotd-count">634</strong>
+          reports today
+        </div>
+        <div class="hero-metric">
+          <strong>99%</strong>
+          confidence
+        </div>
+        <div class="hero-metric">
+          <strong>₹1.2Cr</strong>
+          avg loss
+        </div>
+      </div>
+    </section>
+
+    <!-- Layer: stats + map -->
+    <section class="layer-row">
+      <div class="panel stats-panel">
+        <div class="stat-total-block">
+          <div class="stat-total-label">Total Scams</div>
+          <div id="stat-total">2,847</div>
+        </div>
+        <div class="stat-row-small">
+          <div>
+            <div class="stat-small-label">Digital Arrest</div>
+            <div class="stat-small-value" id="stat-arrest">634</div>
+          </div>
+          <div>
+            <div class="stat-small-label">Fake Cashback</div>
+            <div class="stat-small-value" id="stat-cashback">891</div>
+          </div>
+          <div>
+            <div class="stat-small-label">KYC Freeze</div>
+            <div class="stat-small-value" id="stat-kyc">421</div>
           </div>
         </div>
-        <button class="tester-btn" id="tester-btn" onclick="analyzeMessage()">ANALYZE<br>→</button>
+        <div class="stat-row-small">
+          <div>
+            <div class="stat-small-label">Amount Saved</div>
+            <div class="stat-small-value">₹4.2Cr</div>
+          </div>
+          <div>
+            <div class="stat-small-label">Model Accuracy</div>
+            <div class="stat-small-value">96.4%</div>
+          </div>
+          <div>
+            <div class="stat-small-label">Model</div>
+            <div class="stat-small-value">Azure o4-mini</div>
+          </div>
+        </div>
       </div>
 
-      <div class="tester-loading" id="tester-loading">
-        <div class="loading-dots"><span></span><span></span><span></span></div>
-        Analyzing with Azure OpenAI o4-mini...
+      <div class="panel map-panel">
+        <div class="map-shell">
+          <div id="map"></div>
+        </div>
+        <div class="map-controls">
+          <button class="map-btn active" onclick="setLayer('heat')">HEATMAP</button>
+          <button class="map-btn" onclick="setLayer('markers')">MARKERS</button>
+          <button class="map-btn" onclick="setLayer('both')">BOTH</button>
+        </div>
+        <div class="map-legend">
+          <div class="legend-title">Scam Intensity</div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#ff2d55"></div> Critical (50+)
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#007aff"></div> High (20–50)
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#ffd60a"></div> Medium (5–20)
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#30d158"></div> Low (&lt;5)
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Layer: feed + tabs/tester -->
+    <section class="lower-layer">
+      <div class="panel">
+        <div class="feed-title">Live Scam Feed</div>
+        <div class="feed-meta">Last few minutes · Highest-risk SMS scams detected across India</div>
+        <div id="tab-feed"></div>
       </div>
 
-      <div class="tester-result" id="tester-result"></div>
-    </div>
+      <div class="right-column">
+        <div class="panel tabs-panel">
+          <div class="sidebar-tabs">
+            <button class="tab active" onclick="switchTab('feed', this)">Feed</button>
+            <button class="tab" onclick="switchTab('network', this)">Network</button>
+            <button class="tab" onclick="switchTab('stats', this)">Category</button>
+          </div>
+          <div class="tab-content active" id="tab-feed"></div>
+          <div class="tab-content" id="tab-network">
+            <canvas id="network-canvas"></canvas>
+          </div>
+          <div class="tab-content" id="tab-stats"></div>
+        </div>
 
-    <!-- ── Evolution ── -->
-    <div class="evolution-section">
+        <div class="panel tester-section">
+          <div class="tester-header">
+            <div class="tester-badge">⚡ Live</div>
+            <div>
+              <div class="tester-title">Real-Time Scam Analyzer</div>
+              <div class="tester-sub">Paste any SMS · Classified via Azure OpenAI o4-mini</div>
+            </div>
+          </div>
+
+          <div class="tester-grid">
+            <div class="tester-input-wrap">
+              <input
+                class="tester-textarea"
+                id="tester-input"
+                placeholder="Paste any suspicious SMS here..."
+              />
+              <div class="tester-examples">
+                <span class="example-chip" onclick="fillExample('cashback')">💸 Cashback</span>
+                <span class="example-chip" onclick="fillExample('arrest')">🚔 Arrest</span>
+                <span class="example-chip" onclick="fillExample('kyc')">🏦 KYC</span>
+                <span class="example-chip" onclick="fillExample('job')">💼 Job</span>
+                <span class="example-chip" onclick="fillExample('legit')">✅ Legit</span>
+              </div>
+            </div>
+            <button class="tester-btn" id="tester-btn" onclick="analyzeMessage()">Analyze →</button>
+          </div>
+
+          <div class="tester-loading" id="tester-loading">
+            <span>• • •</span>
+            Analyzing with Azure OpenAI o4-mini...
+          </div>
+
+          <div class="tester-result" id="tester-result"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Evolution -->
+    <section class="panel evolution-section">
       <div class="evolution-title">Scam Evolution — Pattern Inheritance (2020–2025)</div>
       <div class="evolution-heading">How new SMS scams inherit structure from older playbooks</div>
-      <div class="evolution-sub">Cosine similarity between template embeddings (text-embedding-3-small, Azure OpenAI). Pairs with similarity &gt; 0.82 flagged as <span style="color:var(--accent);">HIGH SIMILARITY</span>.</div>
-      <table class="evolution-table">
-        <thead><tr><th style="width:26%;">Template A</th><th style="width:26%;">Template B</th><th style="width:10%;">Similarity</th><th>Pattern Overlap</th></tr></thead>
-        <tbody>
-          <tr class="evolution-row-high"><td>KBC Lottery 2020</td><td>Jio Lucky Draw 2021</td><td class="evolution-score-high">0.89 · HIGH</td><td><div class="evolution-bar"><div class="evolution-bar-fill" style="width:89%;"></div></div></td></tr>
-          <tr><td>KBC Lottery 2020</td><td>Fake Cashback 2022</td><td>0.77</td><td><div class="evolution-bar"><div class="evolution-bar-fill low" style="width:77%;"></div></div></td></tr>
-          <tr><td>KBC Lottery 2020</td><td>KYC Freeze 2023</td><td>0.74</td><td><div class="evolution-bar"><div class="evolution-bar-fill low" style="width:74%;"></div></div></td></tr>
-          <tr class="evolution-row-high"><td>Fake Cashback 2022</td><td>Digital Arrest 2024</td><td class="evolution-score-high">0.83 · HIGH</td><td><div class="evolution-bar"><div class="evolution-bar-fill" style="width:83%;"></div></div></td></tr>
-          <tr class="evolution-row-high"><td>Fake Cashback 2022</td><td>E‑Challan Phishing 2025</td><td class="evolution-score-high">0.84 · HIGH</td><td><div class="evolution-bar"><div class="evolution-bar-fill" style="width:84%;"></div></div></td></tr>
-          <tr class="evolution-row-high"><td>KYC Freeze 2023</td><td>Digital Arrest 2024</td><td class="evolution-score-high">0.86 · HIGH</td><td><div class="evolution-bar"><div class="evolution-bar-fill" style="width:86%;"></div></div></td></tr>
-          <tr><td>Digital Arrest 2024</td><td>E‑Challan Phishing 2025</td><td class="evolution-score-high">0.82 · HIGH</td><td><div class="evolution-bar"><div class="evolution-bar-fill" style="width:82%;"></div></div></td></tr>
-        </tbody>
-      </table>
-      <div class="evolution-footnote">FraudShield detects new scam variants because they inherit patterns from older scams (similarity &gt; 0.82).</div>
-    </div>
+      <div class="evolution-sub">
+        Cosine similarity between template embeddings (text-embedding-3-small, Azure OpenAI).
+        Pairs with similarity &gt; 0.82 flagged as <span style="color:var(--accent);">HIGH SIMILARITY</span>.
+      </div>
 
-  </div><!-- end bottom-sections -->
-</div><!-- end main-content -->
+      <div class="evolution-cards">
+        <div class="evo-card">
+          <div class="evo-top">
+            <div class="evo-pair">KBC Lottery 2020 <span>→</span> Jio Lucky Draw 2021</div>
+            <div class="evo-score"><strong>0.89</strong> · HIGH</div>
+          </div>
+          <div class="evo-meta">
+            <div class="evo-overlap">Pattern overlap</div>
+            <div class="evolution-bar"><div class="evolution-bar-fill" style="width:89%;"></div></div>
+          </div>
+        </div>
+
+        <div class="evo-card">
+          <div class="evo-top">
+            <div class="evo-pair">KBC Lottery 2020 <span>→</span> Fake Cashback 2022</div>
+            <div class="evo-score">0.77</div>
+          </div>
+          <div class="evo-meta">
+            <div class="evo-overlap">Pattern overlap</div>
+            <div class="evolution-bar"><div class="evolution-bar-fill low" style="width:77%;"></div></div>
+          </div>
+        </div>
+
+        <div class="evo-card">
+          <div class="evo-top">
+            <div class="evo-pair">KBC Lottery 2020 <span>→</span> KYC Freeze 2023</div>
+            <div class="evo-score">0.74</div>
+          </div>
+          <div class="evo-meta">
+            <div class="evo-overlap">Pattern overlap</div>
+            <div class="evolution-bar"><div class="evolution-bar-fill low" style="width:74%;"></div></div>
+          </div>
+        </div>
+
+        <div class="evo-card">
+          <div class="evo-top">
+            <div class="evo-pair">Fake Cashback 2022 <span>→</span> Digital Arrest 2024</div>
+            <div class="evo-score"><strong>0.83</strong> · HIGH</div>
+          </div>
+          <div class="evo-meta">
+            <div class="evo-overlap">Pattern overlap</div>
+            <div class="evolution-bar"><div class="evolution-bar-fill" style="width:83%;"></div></div>
+          </div>
+        </div>
+
+        <div class="evo-card">
+          <div class="evo-top">
+            <div class="evo-pair">Fake Cashback 2022 <span>→</span> E‑Challan Phishing 2025</div>
+            <div class="evo-score"><strong>0.84</strong> · HIGH</div>
+          </div>
+          <div class="evo-meta">
+            <div class="evo-overlap">Pattern overlap</div>
+            <div class="evolution-bar"><div class="evolution-bar-fill" style="width:84%;"></div></div>
+          </div>
+        </div>
+
+        <div class="evo-card">
+          <div class="evo-top">
+            <div class="evo-pair">KYC Freeze 2023 <span>→</span> Digital Arrest 2024</div>
+            <div class="evo-score"><strong>0.86</strong> · HIGH</div>
+          </div>
+          <div class="evo-meta">
+            <div class="evo-overlap">Pattern overlap</div>
+            <div class="evolution-bar"><div class="evolution-bar-fill" style="width:86%;"></div></div>
+          </div>
+        </div>
+
+        <div class="evo-card">
+          <div class="evo-top">
+            <div class="evo-pair">Digital Arrest 2024 <span>→</span> E‑Challan Phishing 2025</div>
+            <div class="evo-score"><strong>0.82</strong> · HIGH</div>
+          </div>
+          <div class="evo-meta">
+            <div class="evo-overlap">Pattern overlap</div>
+            <div class="evolution-bar"><div class="evolution-bar-fill" style="width:82%;"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="evolution-footnote" style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);margin-top:10px;">
+        FraudShield detects new scam variants because they inherit patterns from older scams (similarity &gt; 0.82).
+      </div>
+    </section>
+  </main>
+</div>
 
 <script>
 const HOTSPOTS = [
@@ -761,9 +1001,9 @@ const FEED_DATA = [
 ];
 
 const CAT_COLORS = {
-  fake_cashback:"#f97316", digital_arrest:"#ef4444", kyc_freeze:"#22d3ee",
-  job_scam:"#d29922", lottery_scam:"#3fb950", govt_impersonation:"#a78bfa",
-  phishing_link:"#f87171", legitimate:"#3fb950",
+  fake_cashback:"#0a84ff", digital_arrest:"#ff2d55", kyc_freeze:"#5e5ce6",
+  job_scam:"#5e5ce6", lottery_scam:"#30d158", govt_impersonation:"#0a84ff",
+  phishing_link:"#ff2d55", legitimate:"#30d158",
 };
 
 const EXAMPLES = {
@@ -778,11 +1018,11 @@ const EXAMPLES = {
 const map = L.map("map", {center:[22.5,82.5],zoom:5,zoomControl:true,minZoom:4,maxZoom:10});
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"OSM"}).addTo(map);
 const heatData = HOTSPOTS.map(h=>[h[0],h[1],h[2]]);
-const heatLayer = L.heatLayer(heatData,{radius:40,blur:30,maxZoom:10,gradient:{0.2:"#22d3ee",0.5:"#f97316",0.8:"#ef4444",1.0:"#ffffff"}});
+const heatLayer = L.heatLayer(heatData,{radius:40,blur:30,maxZoom:10,gradient:{0.2:"#5e5ce6",0.5:"#0a84ff",0.8:"#ff2d55",1.0:"#ffffff"}});
 const markersLayer = L.layerGroup();
 HOTSPOTS.forEach(h=>{
   const [lat,lng,intensity,city,state,count,cat]=h;
-  const color=CAT_COLORS[cat]||"#f97316";
+  const color=CAT_COLORS[cat]||"#0a84ff";
   const radius=5+intensity*12;
   L.circleMarker([lat,lng],{radius,fillColor:color,color,weight:1,opacity:0.9,fillOpacity:0.6})
     .bindTooltip(`<strong>${city}, ${state}</strong><br>${count} reports · ${cat.replace(/_/g," ")}`,{className:"scam-tooltip"})
@@ -842,7 +1082,7 @@ function drawNetwork(){
     ctx.beginPath();
     ctx.moveTo(a.x*scaleX,a.y*scaleY);
     ctx.lineTo(b.x*scaleX,b.y*scaleY);
-    ctx.strokeStyle=isRing?"rgba(249,115,22,0.7)":"rgba(239,68,68,0.35)";
+    ctx.strokeStyle=isRing?"rgba(94,92,230,0.7)":"rgba(255,45,85,0.35)";
     ctx.lineWidth=isRing?2:1;
     ctx.setLineDash(isRing?[]:[4,4]);
     ctx.stroke();
@@ -850,7 +1090,7 @@ function drawNetwork(){
   });
   SCAM_NETWORK.nodes.forEach(n=>{
     const x=n.x*scaleX,y=n.y*scaleY;
-    const color=n.type==="phone"?"#22d3ee":n.type==="ring"?"#f97316":"#ef4444";
+    const color=n.type==="phone"?"#0a84ff":n.type==="ring"?"#5e5ce6":"#ff2d55";
     const radius=n.type==="phone"?8:6;
     const grd=ctx.createRadialGradient(x,y,0,x,y,radius*3);
     grd.addColorStop(0,color+"44");
@@ -886,7 +1126,7 @@ function renderCategoryStats(){
     {name:"Lottery Scam",count:57,pct:2,cat:"lottery_scam"},
   ];
   cats.forEach(c=>{
-    const color=CAT_COLORS[c.cat]||"#f97316";
+    const color=CAT_COLORS[c.cat]||"#0a84ff";
     const div=document.createElement("div");
     div.style.cssText="padding:0 4px";
     div.innerHTML=`
@@ -894,8 +1134,8 @@ function renderCategoryStats(){
         <span>${c.name}</span>
         <span style="font-family:'Space Mono',monospace;color:${color}">${c.count}</span>
       </div>
-      <div style="background:var(--border);border-radius:2px;height:6px;margin-bottom:12px;overflow:hidden;">
-        <div style="width:${c.pct}%;height:100%;background:${color};border-radius:2px;"></div>
+      <div style="background:var(--border);border-radius:var(--radius);height:6px;margin-bottom:12px;overflow:hidden;">
+        <div style="width:${c.pct}%;height:100%;background:${color};border-radius:var(--radius);"></div>
       </div>`;
     container.appendChild(div);
   });
@@ -988,7 +1228,7 @@ async function analyzeMessage(){
     const conf = Math.round((data.confidence||0)*100);
     const hindi = data.explanation_hindi || "";
     const flags = data.red_flags || [];
-    const color = CAT_COLORS[cat] || "#f97316";
+    const color = CAT_COLORS[cat] || "#0a84ff";
 
     resultDiv.innerHTML = `
       <div class="result-verdict" style="color:${isScam?'var(--accent2)':'var(--green)'}">
@@ -1123,7 +1363,7 @@ const INDIA_CITIES_LATLNG = [
 function dropTestPinOnMap(category) {
   if (testPinLayer) { map.removeLayer(testPinLayer); }
   const city = INDIA_CITIES_LATLNG[Math.floor(Math.random() * INDIA_CITIES_LATLNG.length)];
-  const color = CAT_COLORS[category] || "#f97316";
+  const color = CAT_COLORS[category] || "#0a84ff";
 
   // Pulsing circle
   testPinLayer = L.layerGroup();
