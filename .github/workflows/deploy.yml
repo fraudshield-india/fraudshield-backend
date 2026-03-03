@@ -32,3 +32,7 @@ jobs:
           package: "."
           publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
           respect-funcignore: true
+
+      - name: Warm up /api/health
+        run: |
+          curl -sS "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net/api/health" || echo "Health probe failed (function app may still be starting)"

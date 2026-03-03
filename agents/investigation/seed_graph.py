@@ -1,19 +1,19 @@
+import nest_asyncio
+
+nest_asyncio.apply()
+
 """
 FraudShield India — Cosmos DB Gremlin Seed Script
 Seeds scam UPI IDs, phone numbers, and their connections into the graph.
 
 Usage:
-  pip install gremlinpython python-dotenv nest_asyncio
+  pip install gremlinpython nest_asyncio
   python agents/investigation/seed_graph.py
 
 Env vars needed:
-  COSMOS_DB_ENDPOINT=https://fraudshield-graphdb.documents.azure.com:443/
+  COSMOS_DB_ENDPOINT=https://fraudshield-cosmosdb.documents.azure.com:443/
   COSMOS_DB_KEY=your_primary_key
 """
-
-# Apply nest_asyncio patch to prevent event loop conflicts with gremlinpython on Python 3.11+
-import nest_asyncio
-nest_asyncio.apply()
 
 import logging
 import os
@@ -22,8 +22,6 @@ import time
 import traceback
 from concurrent.futures import TimeoutError as FutureTimeoutError
 
-from dotenv import load_dotenv
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -31,36 +29,49 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-load_dotenv()
-
 try:
     from gremlin_python.driver import client, serializer
 except ImportError:
     log.error("Run: pip install gremlinpython")
     sys.exit(1)
 
-QUERY_TIMEOUT = 30   # seconds — per-query timeout to prevent hanging
-BATCH_SIZE = 5       # concurrent queries to submit at once
+
+QUERY_TIMEOUT = 30  # seconds — per-query timeout to prevent hanging
+BATCH_SIZE = 5      # concurrent queries to submit at once
 
 
 def _build_client(endpoint: str, key: str):
     """Create and return a connected Gremlin client with timeout configuration."""
-    log.info("🔌 Connecting to Gremlin endpoint: %s", endpoint)
+    log.info("🔌 Connecting to Gremlin endpoint host: %s", endpoint)
     t0 = time.time()
-    gremlin_client = client.Client(
-        f"wss://{endpoint}:443/",
-        "g",
-        username="/dbs/FraudShieldDB/colls/ScamNetwork",
-        password=key,
-        message_serializer=serializer.GraphSONSerializersV2d0(),
-        read_timeout=QUERY_TIMEOUT,
-        write_timeout=QUERY_TIMEOUT,
-    )
-    log.info("✅ Client created in %.1fs", time.time() - t0)
+    try:
+        gremlin_client = client.Client(
+            f"wss://{endpoint}:443/",
+            "g",
+            username="/dbs/FraudShieldDB/colls/ScamNetwork",
+            password=key,
+            message_serializer=serializer.GraphSONSerializersV2d0(),
+            read_timeout=QUERY_TIMEOUT,
+            write_timeout=QUERY_TIMEOUT,
+        )
+        # Lightweight connectivity probe so the workflow fails fast if unreachable
+        probe = gremlin_client.submitAsync("g.V().limit(1)").result()
+        _ = probe.all().result()
+    except Exception as e:
+        log.error("❌ Could not connect to Cosmos DB Gremlin endpoint.")
+        log.error("   Host: %s", endpoint)
+        log.error("   Error: %s", e)
+        log.error(
+            "   Tip: Verify COSMOS_DB_ENDPOINT, COSMOS_DB_KEY and that the Gremlin "
+            "firewall allows GitHub Actions IPs."
+        )
+        raise
+
+    log.info("✅ Gremlin client ready in %.1fs", time.time() - t0)
     return gremlin_client
 
 
-def run(gremlin_client, query: str, bindings: dict = None):
+def run(gremlin_client, query: str, bindings: dict | None = None):
     """Execute a single Gremlin query and return results."""
     try:
         future = gremlin_client.submitAsync(query, bindings=bindings)
@@ -112,36 +123,38 @@ def drop_all(gremlin_client):
             log.info("Aborted.")
             sys.exit(0)
     else:
-        log.info("🤖 Non-interactive mode -- skipping drop confirmation.")
+        log.info("🤖 Non-interactive mode — skipping drop confirmation.")
     log.info("🗑️  Clearing existing graph data...")
     t0 = time.time()
     run(gremlin_client, "g.V().drop()")
     log.info("   Cleared in %.1fs", time.time() - t0)
 
+
 # ── Scam UPI IDs ──────────────────────────────────────────────────────────────
 # Format: (id, vpa, category, report_count, status, state, victims_est)
 SCAM_UPIS = [
     ("upi1",  "taskpay.earn@ybl",         "job_scam",          27, "active",   "Maharashtra",    450),
-    ("upi2",  "kbcprize2024@paytm",        "lottery_scam",      23, "active",   "Uttar Pradesh",  380),
-    ("upi3",  "sbikyc.update@ybl",         "kyc_freeze",         8, "blocked",  "Rajasthan",      120),
-    ("upi4",  "cashback.official@okaxis",  "fake_cashback",     31, "active",   "Delhi",          520),
-    ("upi5",  "cbi.penalty@upi",           "digital_arrest",    12, "active",   "Tamil Nadu",     200),
-    ("upi6",  "echallane.pay@ybl",         "govt_impersonation", 6, "active",   "Karnataka",       90),
-    ("upi7",  "refund.process@paytm",      "fake_cashback",     19, "active",   "Gujarat",        310),
-    ("upi8",  "youtube.task@ybl",          "job_scam",          27, "active",   "West Bengal",    440),
-    ("upi9",  "jiodraw@paytm",             "lottery_scam",      15, "active",   "Bihar",          250),
-    ("upi10", "loanfast@ybl",              "job_scam",           9, "active",   "Telangana",      150),
-    ("upi11", "goldscheme@ybl",            "fake_cashback",     11, "active",   "Madhya Pradesh", 180),
-    ("upi12", "customsduty@ybl",           "govt_impersonation",14, "active",   "Punjab",         230),
-    ("upi13", "doubleincome@ybl",          "fake_cashback",     21, "active",   "Haryana",        350),
-    ("upi14", "dream11winner@ybl",         "lottery_scam",      17, "active",   "Andhra Pradesh", 280),
-    ("upi15", "meta-jobs@ybl",             "job_scam",           7, "active",   "Kerala",         110),
-    ("upi16", "cybercell@ybl",             "digital_arrest",    18, "active",   "Delhi",          300),
-    ("upi17", "flipkart-prize@okaxis",     "lottery_scam",      13, "active",   "Maharashtra",    210),
-    ("upi18", "taxsettlement@ybl",         "govt_impersonation",10, "active",   "Uttar Pradesh",  165),
-    ("upi19", "bgv-check@ybl",             "job_scam",           5, "active",   "Karnataka",       80),
-    ("upi20", "bescom-urgent@ybl",         "govt_impersonation", 8, "active",   "Karnataka",      130),
+    ("upi2",  "kbcprize2024@paytm",      "lottery_scam",      23, "active",   "Uttar Pradesh",  380),
+    ("upi3",  "sbikyc.update@ybl",       "kyc_freeze",         8, "blocked",  "Rajasthan",      120),
+    ("upi4",  "cashback.official@okaxis","fake_cashback",     31, "active",   "Delhi",          520),
+    ("upi5",  "cbi.penalty@upi",         "digital_arrest",    12, "active",   "Tamil Nadu",     200),
+    ("upi6",  "echallane.pay@ybl",       "govt_impersonation", 6, "active",   "Karnataka",       90),
+    ("upi7",  "refund.process@paytm",    "fake_cashback",     19, "active",   "Gujarat",        310),
+    ("upi8",  "youtube.task@ybl",        "job_scam",          27, "active",   "West Bengal",    440),
+    ("upi9",  "jiodraw@paytm",           "lottery_scam",      15, "active",   "Bihar",          250),
+    ("upi10", "loanfast@ybl",            "job_scam",           9, "active",   "Telangana",      150),
+    ("upi11", "goldscheme@ybl",          "fake_cashback",     11, "active",   "Madhya Pradesh", 180),
+    ("upi12", "customsduty@ybl",         "govt_impersonation",14, "active",   "Punjab",         230),
+    ("upi13", "doubleincome@ybl",        "fake_cashback",     21, "active",   "Haryana",        350),
+    ("upi14", "dream11winner@ybl",       "lottery_scam",      17, "active",   "Andhra Pradesh", 280),
+    ("upi15", "meta-jobs@ybl",           "job_scam",           7, "active",   "Kerala",         110),
+    ("upi16", "cybercell@ybl",           "digital_arrest",    18, "active",   "Delhi",          300),
+    ("upi17", "flipkart-prize@okaxis",   "lottery_scam",      13, "active",   "Maharashtra",    210),
+    ("upi18", "taxsettlement@ybl",       "govt_impersonation",10, "active",   "Uttar Pradesh",  165),
+    ("upi19", "bgv-check@ybl",           "job_scam",           5, "active",   "Karnataka",       80),
+    ("upi20", "bescom-urgent@ybl",       "govt_impersonation", 8, "active",   "Karnataka",      130),
 ]
+
 
 # ── Phone numbers ─────────────────────────────────────────────────────────────
 # Format: (id, number, state, operator)
@@ -158,18 +171,19 @@ SCAM_PHONES = [
     ("ph10", "+91-9876500010", "Haryana",        "Vi"),
 ]
 
+
 # ── UPI → Phone links (same scammer controls multiple accounts) ───────────────
 # Format: (phone_id, upi_id, relationship)
 LINKS = [
     ("ph1",  "upi1",  "OPERATED_BY"),
-    ("ph1",  "upi8",  "OPERATED_BY"),   # Same phone → 2 UPIs = linked scammer
+    ("ph1",  "upi8",  "OPERATED_BY"),
     ("ph2",  "upi2",  "OPERATED_BY"),
-    ("ph2",  "upi9",  "OPERATED_BY"),   # Same phone → 2 UPIs
+    ("ph2",  "upi9",  "OPERATED_BY"),
     ("ph3",  "upi4",  "OPERATED_BY"),
-    ("ph3",  "upi7",  "OPERATED_BY"),   # Same phone → 2 UPIs
-    ("ph3",  "upi13", "OPERATED_BY"),   # Same phone → 3 UPIs = scam ring!
+    ("ph3",  "upi7",  "OPERATED_BY"),
+    ("ph3",  "upi13", "OPERATED_BY"),
     ("ph4",  "upi5",  "OPERATED_BY"),
-    ("ph4",  "upi16", "OPERATED_BY"),   # Digital arrest ring
+    ("ph4",  "upi16", "OPERATED_BY"),
     ("ph5",  "upi3",  "OPERATED_BY"),
     ("ph6",  "upi6",  "OPERATED_BY"),
     ("ph7",  "upi12", "OPERATED_BY"),
@@ -177,10 +191,9 @@ LINKS = [
     ("ph9",  "upi17", "OPERATED_BY"),
     ("ph10", "upi10", "OPERATED_BY"),
     ("ph10", "upi15", "OPERATED_BY"),
-    ("ph10", "upi19", "OPERATED_BY"),   # Job scam ring — same phone 3 UPIs
+    ("ph10", "upi19", "OPERATED_BY"),
 ]
 
-# ── Seed UPI vertices ─────────────────────────────────────────────────────────
 
 def seed_upis(gremlin_client):
     log.info("📌 Seeding %d scam UPI vertices...", len(SCAM_UPIS))
@@ -199,8 +212,12 @@ def seed_upis(gremlin_client):
             ".property('pk', cat)"
         )
         bindings = {
-            "vid": uid, "vpa": vpa, "cat": cat,
-            "report_count": count, "status": status, "state": state,
+            "vid": uid,
+            "vpa": vpa,
+            "cat": cat,
+            "report_count": count,
+            "status": status,
+            "state": state,
             "estimated_victims": victims,
         }
         queries.append((q, bindings))
@@ -254,34 +271,37 @@ def print_stats(gremlin_client):
     log.info("   Stats fetched in %.1fs", time.time() - t0)
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
-
 def main():
     log.info("🕸️  FraudShield India — Seeding Scam Network Graph")
     log.info("=" * 55)
     script_start = time.time()
 
-    COSMOS_ENDPOINT = os.environ.get("COSMOS_DB_ENDPOINT", "")
-    COSMOS_KEY = os.environ.get("COSMOS_DB_KEY", "")
+    cosmos_endpoint = os.environ.get("COSMOS_DB_ENDPOINT", "")
+    cosmos_key = os.environ.get("COSMOS_DB_KEY", "")
 
-    log.info("ENDPOINT present: %s", bool(COSMOS_ENDPOINT))
-    log.info("KEY present: %s", bool(COSMOS_KEY))
-    if COSMOS_ENDPOINT:
-        log.info("ENDPOINT prefix: %s...", COSMOS_ENDPOINT[:30])
+    log.info("ENDPOINT present: %s", bool(cosmos_endpoint))
+    log.info("KEY present: %s", bool(cosmos_key))
+    if cosmos_endpoint:
+        log.info("ENDPOINT prefix: %s...", cosmos_endpoint[:30])
 
-    if not COSMOS_ENDPOINT or not COSMOS_KEY:
-        log.error("Available COSMOS env vars: %s", [k for k in os.environ if "COSMOS" in k.upper()])
-        log.error("❌ Set COSMOS_DB_ENDPOINT and COSMOS_DB_KEY in your .env file")
+    if not cosmos_endpoint or not cosmos_key:
+        log.error(
+            "Available COSMOS env vars: %s",
+            [k for k in os.environ if "COSMOS" in k.upper()],
+        )
+        log.error(
+            "❌ COSMOS_DB_ENDPOINT or COSMOS_DB_KEY not set. Configure them in "
+            "GitHub Actions secrets or your environment."
+        )
         sys.exit(1)
 
-    COSMOS_ENDPOINT = (
-        COSMOS_ENDPOINT.replace("https://", "").replace("http://", "")
-        .rstrip("/").removesuffix(":443")
-    )
+    # Normalise endpoint: strip protocol, optional :443 or :443/ and trailing slash
+    cosmos_endpoint = cosmos_endpoint.replace("https://", "").replace("http://", "")
+    cosmos_endpoint = cosmos_endpoint.replace(":443/", "").replace(":443", "").rstrip("/")
 
     gremlin_client = None
     try:
-        gremlin_client = _build_client(COSMOS_ENDPOINT, COSMOS_KEY)
+        gremlin_client = _build_client(cosmos_endpoint, cosmos_key)
 
         t0 = time.time()
         drop_all(gremlin_client)
@@ -302,7 +322,7 @@ def main():
         print_stats(gremlin_client)
 
         log.info("✅ Graph seeded successfully in %.1fs total", time.time() - script_start)
-        log.info("   View at: portal.azure.com → fraudshield-graphdb → Data Explorer")
+        log.info("   View at: portal.azure.com → fraudshield-cosmosdb → Data Explorer")
 
     except Exception:
         log.error("❌ Seed failed:\n%s", traceback.format_exc())
@@ -316,3 +336,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
