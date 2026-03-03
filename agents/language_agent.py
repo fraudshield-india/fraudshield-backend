@@ -1,3 +1,4 @@
+import logging
 import os
 from azure.ai.textanalytics import TextAnalyticsClient
 from azure.core.credentials import AzureKeyCredential
@@ -31,7 +32,8 @@ def analyze_message(message):
             result["detected_language"] = detected.primary_language.name
             result["language_code"] = detected.primary_language.iso6391_name
             result["language_confidence"] = detected.primary_language.confidence_score
-    except Exception as e:
+    except Exception:
+        logging.warning("Language detection failed", exc_info=True)
         result["detected_language"] = "unknown"
         result["language_code"] = "un"
         result["language_confidence"] = 0.0
@@ -58,7 +60,8 @@ def analyze_message(message):
                 "persons": [e["text"] for e in entities if e["category"] == "Person"],
                 "organizations": [e["text"] for e in entities if e["category"] == "Organization"],
             }
-    except Exception as e:
+    except Exception:
+        logging.warning("PII detection failed", exc_info=True)
         result["pii_entities"] = []
         result["extracted_evidence"] = {}
 
@@ -73,7 +76,8 @@ def analyze_message(message):
                 "neutral": sentiment.confidence_scores.neutral,
                 "negative": sentiment.confidence_scores.negative
             }
-    except Exception as e:
+    except Exception:
+        logging.warning("Sentiment analysis failed", exc_info=True)
         result["sentiment"] = "unknown"
         result["sentiment_scores"] = {}
 
