@@ -55,8 +55,12 @@ def _build_client(endpoint: str, key: str):
             write_timeout=QUERY_TIMEOUT,
         )
         # Lightweight connectivity probe so the workflow fails fast if unreachable
-        probe = gremlin_client.submitAsync("g.V().limit(1)").result()
+        probe_future = gremlin_client.submitAsync("g.V().limit(1)")
+        probe = probe_future.result(timeout=QUERY_TIMEOUT)
         _ = probe.all().result()
+    except FutureTimeoutError:
+        log.error("⏱️  Connectivity probe timed out after %ds", QUERY_TIMEOUT)
+        raise
     except Exception as e:
         log.error("❌ Could not connect to Cosmos DB Gremlin endpoint.")
         log.error("   Host: %s", endpoint)
