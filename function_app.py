@@ -98,9 +98,11 @@ def generate_response_complaint(category: str, message: str, sender: str, red_fl
 
     raw = response.choices[0].message.content.strip()
     if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
+        parts = raw.split("```")
+        if len(parts) >= 2:
+            raw = parts[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
     return json.loads(raw.strip())
 
 def classify_message(message: str, source: str = "unknown", sender: str = "unknown") -> dict:
