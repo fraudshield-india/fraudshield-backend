@@ -466,6 +466,97 @@
     padding: 8px 12px !important;
     box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
   }
+  
+  /* ── Scam evolution table ── */
+  .evolution-section {
+    margin: 32px auto 24px;
+    max-width: 1040px;
+    padding: 20px 24px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: radial-gradient(circle at top left, rgba(249,115,22,0.08), transparent 55%);
+  }
+
+  .evolution-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .evolution-heading {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .evolution-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .evolution-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+  }
+
+  .evolution-table th,
+  .evolution-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+
+  .evolution-table th {
+    color: var(--muted);
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-size: 10px;
+  }
+
+  .evolution-row-high {
+    background: rgba(249,115,22,0.08);
+  }
+
+  .evolution-score-high {
+    color: var(--accent);
+  }
+
+  .evolution-bar {
+    position: relative;
+    width: 180px;
+    height: 6px;
+    background: var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .evolution-bar-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+
+  .evolution-bar-fill.low {
+    background: linear-gradient(90deg, #22d3ee, var(--accent3));
+  }
+
+  .evolution-footnote {
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
 </style>
 </head>
 <body>
@@ -595,6 +686,100 @@
     <div class="tab-content" id="tab-stats" style="padding:16px;gap:8px;">
     </div>
   </div>
+  <!-- Scam Evolution section (bottom) -->
+  <section class="evolution-section">
+    <div class="evolution-title">Scam Evolution — Pattern Inheritance (2020–2025)</div>
+    <div class="evolution-heading">How new SMS scams inherit structure from older playbooks</div>
+    <div class="evolution-sub">
+      Cosine similarity between template embeddings (`text-embedding-3-small`, GitHub Models).  
+      Pairs with similarity &gt; 0.82 are flagged as <span style="color:var(--accent);">HIGH SIMILARITY</span>.
+    </div>
+    <table class="evolution-table">
+      <thead>
+        <tr>
+          <th style="width:26%;">Template A</th>
+          <th style="width:26%;">Template B</th>
+          <th style="width:10%;">Similarity</th>
+          <th>Pattern Overlap</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="evolution-row-high">
+          <td>KBC Lottery 2020</td>
+          <td>Jio Lucky Draw 2021</td>
+          <td class="evolution-score-high">0.89 · HIGH</td>
+          <td>
+            <div class="evolution-bar">
+              <div class="evolution-bar-fill" style="width:89%;"></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>KBC Lottery 2020</td>
+          <td>Fake Cashback 2022</td>
+          <td>0.77</td>
+          <td>
+            <div class="evolution-bar">
+              <div class="evolution-bar-fill low" style="width:77%;"></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>KBC Lottery 2020</td>
+          <td>KYC Freeze 2023</td>
+          <td>0.74</td>
+          <td>
+            <div class="evolution-bar">
+              <div class="evolution-bar-fill low" style="width:74%;"></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>Fake Cashback 2022</td>
+          <td>Digital Arrest 2024</td>
+          <td class="evolution-score-high">0.83 · HIGH</td>
+          <td>
+            <div class="evolution-bar">
+              <div class="evolution-bar-fill" style="width:83%;"></div>
+            </div>
+          </td>
+        </tr>
+        <tr class="evolution-row-high">
+          <td>Fake Cashback 2022</td>
+          <td>E‑Challan Phishing 2025</td>
+          <td class="evolution-score-high">0.84 · HIGH</td>
+          <td>
+            <div class="evolution-bar">
+              <div class="evolution-bar-fill" style="width:84%;"></div>
+            </div>
+          </td>
+        </tr>
+        <tr class="evolution-row-high">
+          <td>KYC Freeze 2023</td>
+          <td>Digital Arrest 2024</td>
+          <td class="evolution-score-high">0.86 · HIGH</td>
+          <td>
+            <div class="evolution-bar">
+              <div class="evolution-bar-fill" style="width:86%;"></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>Digital Arrest 2024</td>
+          <td>E‑Challan Phishing 2025</td>
+          <td class="evolution-score-high">0.82 · HIGH</td>
+          <td>
+            <div class="evolution-bar">
+              <div class="evolution-bar-fill" style="width:82%;"></div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="evolution-footnote">
+      FraudShield detects new scam variants because they inherit patterns from older scams (similarity &gt; 0.82).
+    </div>
+  </section>
 </div>
 
 <script>
