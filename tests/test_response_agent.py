@@ -5,8 +5,9 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 
-# Ensure GITHUB_TOKEN is set so the module can be imported
-os.environ.setdefault("GITHUB_TOKEN", "test-token")
+# Ensure Azure OpenAI env vars are set so the module can be imported
+os.environ.setdefault("AZURE_OPENAI_ENDPOINT", "https://test.openai.azure.com/")
+os.environ.setdefault("AZURE_OPENAI_KEY", "test-key")
 
 import function_app
 
