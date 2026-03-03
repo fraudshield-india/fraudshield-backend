@@ -2,27 +2,29 @@ import azure.functions as func
 import json
 import logging
 import os
-from openai import OpenAI
+from openai import AzureOpenAI
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
-# ── GitHub Models client (lazy-initialised to avoid startup crash) ────────────
+# ── Azure OpenAI client (lazy-initialised to avoid startup crash) ─────────────
 MODEL = "o4-mini"  # reasoning model — no temperature/response_format params
-_client: OpenAI | None = None
+_client: AzureOpenAI | None = None
 
-def _get_client() -> OpenAI:
-    """Return a cached OpenAI client; raises RuntimeError if GITHUB_TOKEN is unset."""
+def _get_client() -> AzureOpenAI:
+    """Return a cached AzureOpenAI client; raises RuntimeError if credentials are unset."""
     global _client
     if _client is None:
-        token = os.getenv("GITHUB_TOKEN")
-        if not token:
+        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+        key = os.getenv("AZURE_OPENAI_KEY")
+        if not endpoint or not key:
             raise RuntimeError(
-                "GITHUB_TOKEN application setting is not configured. "
-                "Add it in Azure Portal → Configuration → Application Settings."
+                "AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_KEY application settings are not configured. "
+                "Add them in Azure Portal → Configuration → Application Settings."
             )
-        _client = OpenAI(
-            base_url=os.getenv("OPENAI_BASE_URL", "https://models.inference.ai.azure.com"),
-            api_key=token,
+        _client = AzureOpenAI(
+            azure_endpoint=endpoint,
+            api_key=key,
+            api_version="2024-12-01-preview",
         )
     return _client
 
@@ -46,7 +48,7 @@ Respond ONLY with valid JSON in this exact schema:
 }"""
 
 def classify_message(message: str, source: str = "unknown", sender: str = "unknown") -> dict:
-    """Call GitHub Models (o4-mini) to classify a UPI fraud message."""
+    """Call Azure OpenAI (o4-mini) to classify a UPI fraud message."""
     user_content = f"Source: {source}\nSender: {sender}\nMessage: {message}" 
 
     response = _get_client().chat.completions.create(
@@ -55,7 +57,7 @@ def classify_message(message: str, source: str = "unknown", sender: str = "unkno
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
-        max_completion_tokens=512,
+        max_tokens=512,
     )
 
     # o4-mini may wrap output in ```json ... ``` — strip it just in case
@@ -126,13 +128,13 @@ def classify(req: func.HttpRequest) -> func.HttpResponse:
 # ── /api/health ───────────────────────────────────────────────────────────────
 @app.route(route="health", methods=["GET"])
 def health(req: func.HttpRequest) -> func.HttpResponse:
-    token_configured = bool(os.environ.get("GITHUB_TOKEN"))
+    azure_openai_configured = bool(os.environ.get("AZURE_OPENAI_ENDPOINT")) and bool(os.environ.get("AZURE_OPENAI_KEY"))
     return func.HttpResponse(
         json.dumps({
             "status": "ok",
             "service": "FraudShield India",
             "model": MODEL,
-            "github_token_configured": token_configured,
+            "azure_openai_configured": azure_openai_configured,
         }),
         status_code=200,
         headers={"Content-Type": "application/json"},
