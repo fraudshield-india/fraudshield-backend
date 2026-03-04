@@ -15,18 +15,18 @@
   />
   <style>
     :root {
-      --bg-black: #f5f0eb;
-      --bg-dark-1: #ede8e3;
-      --bg-dark-2: #e8e2db;
-      --bg-dark-3: #dfd9d1;
-      --text-main: #1a1a1a;
-      --text-muted: #7a7067;
-      --border-subtle: rgba(0, 0, 0, 0.1);
-      --accent-danger: #d4756e;
+      --bg-black: #000000;
+      --bg-dark-1: #0a0a0a;
+      --bg-dark-2: #111111;
+      --bg-dark-3: #1a1a1a;
+      --text-main: #f0f0f0;
+      --text-muted: #888888;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --accent-danger: #e8918a;
       --accent-safe: #85c98a;
-      --pill-bg: #e0dbd4;
-      --card-bg: #eceae6;
-      --step-border: #c8bfb5;
+      --pill-bg: #1a1a1a;
+      --card-bg: #111111;
+      --step-border: #222222;
     }
 
     * {
@@ -70,7 +70,7 @@
     /* HERO */
     .hero {
       min-height: 100vh;
-      background-color: #f5f0eb;
+      background-color: #000000;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -87,7 +87,7 @@
       font-size: 11px;
       letter-spacing: 0.3em;
       text-transform: uppercase;
-      color: #7a7067;
+      color: var(--text-muted);
       margin-bottom: 16px;
       opacity: 0.9;
     }
@@ -98,7 +98,7 @@
       font-size: clamp(40px, 4.1vw, 52px);
       line-height: 1.1;
       margin-bottom: 16px;
-      color: #1a1a1a;
+      color: var(--text-main);
       max-width: 560px;
     }
 
@@ -114,7 +114,7 @@
       border-radius: 16px;
       border: 1px solid var(--border-subtle);
       padding: 18px 18px 16px;
-      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
       backdrop-filter: blur(10px);
     }
 
@@ -125,14 +125,14 @@
       background: transparent;
       border: none;
       outline: none;
-      color: #1a1a1a;
+      color: var(--text-main);
       font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 13px;
       line-height: 1.5;
     }
 
     .hero-textarea::placeholder {
-      color: #b0a79f;
+      color: #555555;
     }
 
     .hero-input-footer {
@@ -155,9 +155,9 @@
       font-size: 12px;
       padding: 6px 16px;
       border-radius: 20px;
-      border: 1px solid rgba(0, 0, 0, 0.12);
-      background-color: #1e1e1e;
-      color: #aaaaaa;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background-color: #1a1a1a;
+      color: #888888;
       cursor: pointer;
       transition: background-color 0.18s ease, color 0.18s ease, transform 0.12s ease, border-color 0.18s ease;
       white-space: nowrap;
@@ -169,8 +169,8 @@
 
     .lang-pill.active {
       background-color: #2a2a2a;
-      border-color: rgba(255, 255, 255, 0.35);
-      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.3);
+      color: #f0f0f0;
     }
 
     .analyze-btn {
@@ -183,8 +183,8 @@
       padding: 9px 18px;
       border-radius: 10px;
       border: none;
-      background-color: #1a1a1a;
-      color: #f5f0eb;
+      background-color: #f0f0f0;
+      color: #000000;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
@@ -194,7 +194,7 @@
     }
 
     .analyze-btn:hover:not(:disabled) {
-      background-color: #2a2a2a;
+      background-color: #e0e0e0;
       transform: translateY(-1px);
       box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
     }
@@ -210,7 +210,7 @@
       width: 6px;
       height: 6px;
       border-radius: 999px;
-      background-color: #85c98a;
+      background-color: var(--accent-safe);
     }
 
     .result-container {
@@ -236,7 +236,7 @@
     }
 
     .result-card.scam {
-      background-color: rgba(212, 117, 110, 0.1);
+      background-color: rgba(232, 145, 138, 0.1);
       border-left: 3px solid #e8918a;
     }
 
@@ -300,7 +300,7 @@
 
     .result-body {
       font-size: 12px;
-      color: #4b433c;
+      color: var(--text-main);
       line-height: 1.5;
       margin-bottom: 10px;
     }
@@ -316,15 +316,15 @@
       padding: 3px 8px;
       background-color: var(--pill-bg);
       border-radius: 999px;
-      border: 1px solid rgba(0, 0, 0, 0.12);
-      color: #4b433c;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text-main);
       font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       white-space: nowrap;
     }
 
     .result-error {
       font-size: 12px;
-      color: #d4756e;
+      color: var(--accent-danger);
     }
 
     /* Scroll hint */
@@ -345,7 +345,7 @@
     .scroll-hint svg {
       width: 18px;
       height: 18px;
-      fill: #7a7067;
+      fill: #888888;
       animation: bounce 1.6s infinite;
     }
 
@@ -372,7 +372,7 @@
       letter-spacing: 0.2em;
       text-transform: uppercase;
       margin-bottom: 16px;
-      color: #7a7067;
+      color: var(--text-muted);
     }
 
     #map {
@@ -380,8 +380,8 @@
       height: 85vh;
       border-radius: 18px;
       overflow: hidden;
-      border: 1px solid rgba(0, 0, 0, 0.12);
-      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.12);
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.8);
       position: relative;
     }
 
@@ -389,7 +389,7 @@
       position: absolute;
       bottom: 10px;
       left: 10px;
-      background-color: rgba(245, 240, 235, 0.9);
+      background-color: rgba(0, 0, 0, 0.7);
       padding: 6px 8px;
       border-radius: 999px;
       display: flex;
@@ -397,7 +397,7 @@
       gap: 10px;
       font-size: 11px;
       font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      color: #1a1a1a;
+      color: #f0f0f0;
       pointer-events: none;
       z-index: 500;
     }
@@ -411,13 +411,13 @@
     .map-note {
       margin-top: 10px;
       font-size: 11px;
-      color: #7a7067;
+      color: var(--text-muted);
       font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
 
     /* SECTION 3 – STATS + CATEGORIES */
     .section-stats {
-      background-color: #e8e2db;
+      background-color: var(--bg-dark-2);
     }
 
     .stats-grid {
@@ -432,7 +432,7 @@
       font-size: 11px;
       letter-spacing: 0.2em;
       text-transform: uppercase;
-      color: #7a7067;
+      color: var(--text-muted);
       margin-bottom: 8px;
     }
 
@@ -459,17 +459,17 @@
     .stat-pill {
       padding: 6px 12px;
       border-radius: 999px;
-      border: 1px solid rgba(0, 0, 0, 0.12);
-      background-color: #dfd9d1;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background-color: var(--pill-bg);
       font-size: 11px;
       font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      color: #4b433c;
+      color: var(--text-main);
     }
 
     .chart-card {
-      background-color: #eceae6;
+      background-color: var(--card-bg);
       border-radius: 16px;
-      border: 1px solid rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--border-subtle);
       padding: 18px 18px 14px;
     }
 
@@ -477,7 +477,7 @@
       font-size: 13px;
       font-weight: 600;
       margin-bottom: 10px;
-      color: #1a1a1a;
+      color: var(--text-main);
     }
 
     .chart-wrapper {
@@ -494,7 +494,7 @@
       gap: 4px 8px;
       font-size: 11px;
       font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      color: #7a7067;
+      color: var(--text-muted);
     }
 
     .chart-legend-item {
@@ -511,7 +511,7 @@
 
     /* SECTION 4 – HOW IT WORKS */
     .section-how {
-      background-color: #f0ece6;
+      background-color: var(--bg-black);
     }
 
     .how-title {
@@ -520,7 +520,7 @@
       letter-spacing: 0.22em;
       text-transform: uppercase;
       margin-bottom: 24px;
-      color: #7a7067;
+      color: var(--text-muted);
     }
 
     .how-grid {
@@ -532,7 +532,7 @@
     .how-card {
       border-radius: 14px;
       border: 1px solid var(--step-border);
-      background-color: #f5f0eb;
+      background-color: var(--bg-dark-1);
       padding: 18px 16px 16px;
     }
 
@@ -549,17 +549,17 @@
       font-weight: 600;
       font-size: 15px;
       margin-bottom: 8px;
-      color: #1a1a1a;
+      color: var(--text-main);
     }
 
     .how-body {
       font-size: 13px;
-      color: #7a7067;
+      color: var(--text-muted);
     }
 
     /* SECTION 5 – SCAM EVOLUTION TABLE */
     .section-table {
-      background-color: #ede8e3;
+      background-color: var(--bg-dark-1);
     }
 
     .table-title {
@@ -568,7 +568,7 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       margin-bottom: 6px;
-      color: #1a1a1a;
+      color: var(--text-main);
     }
 
     .table-subtitle {
@@ -584,19 +584,19 @@
       font-size: 13px;
       border-radius: 14px;
       overflow: hidden;
-      border: 1px solid rgba(0, 0, 0, 0.1);
-      background-color: #f5f0eb;
+      border: 1px solid var(--border-subtle);
+      background-color: var(--bg-dark-2);
     }
 
     .evolution-table thead {
-      background-color: #ede8e3;
+      background-color: var(--bg-dark-3);
     }
 
     .evolution-table th,
     .evolution-table td {
       padding: 10px 12px;
       text-align: left;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     .evolution-table th {
@@ -604,7 +604,7 @@
       font-size: 11px;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: #7a7067;
+      color: var(--text-muted);
     }
 
     .evolution-table tbody tr:last-child td {
@@ -634,7 +634,7 @@
       width: 100%;
       height: 6px;
       border-radius: 999px;
-      background-color: #e0dbd4;
+      background-color: #1a1a1a;
       overflow: hidden;
     }
 
@@ -650,7 +650,7 @@
 
     /* SECTION 6 – FOOTER */
     .section-footer {
-      background-color: #1a1a1a;
+      background-color: #000000;
       border-top: 1px solid rgba(255, 255, 255, 0.08);
       padding-top: 24px;
       padding-bottom: 18px;
@@ -663,7 +663,7 @@
       flex-wrap: wrap;
       gap: 12px;
       font-size: 12px;
-      color: #e5e5e5;
+      color: #f0f0f0;
     }
 
     .logo-mark {
@@ -676,7 +676,7 @@
       width: 22px;
       height: 22px;
       border-radius: 6px;
-      border: 1px solid #f5f0eb;
+      border: 1px solid #f0f0f0;
       position: relative;
       transform: rotate(45deg);
       display: flex;
@@ -690,7 +690,7 @@
       position: absolute;
       inset: 4px;
       border-radius: 4px;
-      border: 1px solid rgba(245, 240, 235, 0.4);
+      border: 1px solid rgba(240, 240, 240, 0.4);
     }
 
     .logo-text {
@@ -698,13 +698,13 @@
       font-size: 11px;
       letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: #f5f0eb;
+      color: #f0f0f0;
     }
 
     .footer-bottom {
       margin-top: 12px;
       font-size: 11px;
-      color: #f5f0eb;
+      color: #f0f0f0;
       font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       text-align: center;
     }
@@ -807,7 +807,10 @@
     <!-- SECTION 2: INDIA FRAUD HOTSPOT MAP -->
     <section class="section section-map" id="map-section">
       <div class="max-width">
-        <div class="section-label">FRAUD HOTSPOTS</div>
+        <div class="section-label">
+          FRAUD HOTSPOTS
+          <span id="liveBadge" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;color:#888;margin-left:12px;vertical-align:middle;">SEED DATA</span>
+        </div>
         <div id="map"></div>
         <div class="map-note">Synthetic illustrative data for demo. Report: cybercrime.gov.in | 1930</div>
       </div>
@@ -984,7 +987,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script>
     // Shared data
-    const scamReports = [
+    const SEED_REPORTS = [
       { city:"Mumbai", lat:19.076, lng:72.8777, reports:847, topScam:"fake_cashback" },
       { city:"Delhi", lat:28.6139, lng:77.209, reports:723, topScam:"digital_arrest" },
       { city:"Bangalore", lat:12.9716, lng:77.5946, reports:534, topScam:"job_scam" },
@@ -1002,6 +1005,7 @@
       { city:"Guwahati", lat:26.1445, lng:91.7362, reports:87, topScam:"digital_arrest" },
       { city:"Manipal", lat:13.3525, lng:74.786, reports:45, topScam:"job_scam" },
     ];
+    let scamReports = [...SEED_REPORTS];
 
     const categoryColors = {
       fake_cashback: "#f4a6a0",
@@ -1201,78 +1205,83 @@
     // Leaflet map + heatmap
     (function setupMap() {
       const map = L.map("map", {
-        zoomControl: false,
+        zoomControl: true,
         attributionControl: false,
       }).setView([20.5937, 78.9629], 5);
 
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      window._leafletMap = map;
+
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
         maxZoom: 18,
       }).addTo(map);
-
-      const maxReports = scamReports.reduce((max, r) => Math.max(max, r.reports), 0);
 
       function radiusForReports(reports) {
         const minR = 8;
         const maxR = 28;
+        const maxReports = scamReports.reduce((max, r) => Math.max(max, r.reports), 0) || 1;
         const ratio = reports / maxReports;
         return minR + (maxR - minR) * ratio;
       }
 
       function colorForReports(reports) {
-        if (reports > 500) return "#e8918a";  // pastel red = Critical
-        if (reports >= 200) return "#f5c07a"; // pastel orange = High
-        return "#85c98a";                    // pastel green = Moderate
+        if (reports > 500) return "#e8918a";  // Critical
+        if (reports >= 200) return "#f5c07a"; // High
+        return "#85c98a";                    // Moderate
       }
 
-      const heatPoints = [];
+      function renderMapData(reports) {
+        const maxReports = reports.reduce((max, r) => Math.max(max, r.reports), 0) || 1;
+        const markersLayer = L.layerGroup().addTo(map);
+        window._mapMarkersLayer = markersLayer;
+        const heatPoints = [];
 
-      scamReports.forEach((r) => {
-        const color = colorForReports(r.reports);
-        const radius = radiusForReports(r.reports);
+        reports.forEach((r) => {
+          const color = colorForReports(r.reports);
+          const radius = radiusForReports(r.reports);
 
-        L.circleMarker([r.lat, r.lng], {
-          radius,
-          color: color,
-          weight: 1.5,
-          fillColor: color,
-          fillOpacity: 0.6,
-        }).addTo(map).bindPopup(`
-          <div style="font-family:'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:12px; color:#1a1a1a; background:#f5f0eb; border:1px solid rgba(0,0,0,0.1); padding:6px 8px; border-radius:8px;">
-            <div style="font-weight:600; margin-bottom:2px;">${r.city}</div>
-            <div style="color:#7a7067; margin-bottom:4px;">Reports: <strong>${r.reports}</strong></div>
-            <div style="margin-bottom:4px;">
-              Top scam:
-              <span style="
-                display:inline-flex;
-                align-items:center;
-                gap:4px;
-                padding:2px 7px;
-                border-radius:999px;
-                border:1px solid ${categoryColors[r.topScam] || "#1a1a1a"};
-                font-size:11px;
-              ">
-                <span style="width:8px;height:8px;border-radius:999px;background:${categoryColors[r.topScam] || "#1a1a1a"};"></span>
-                <span>${formatCategoryLabel(r.topScam)}</span>
-              </span>
+          L.circleMarker([r.lat, r.lng], {
+            radius,
+            color: color,
+            weight: 1.5,
+            fillColor: color,
+            fillOpacity: 0.6,
+          }).addTo(markersLayer).bindPopup(`
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;
+              color:#f0f0f0;background:#111111;border:1px solid rgba(255,255,255,0.1);
+              padding:8px 10px;">
+              <div style="font-weight:600;margin-bottom:3px;">${r.city}</div>
+              <div style="color:#888;margin-bottom:4px;">Reports: <strong style="color:#f0f0f0">${r.reports}</strong></div>
+              <div style="margin-bottom:4px;">Top scam:
+                <span style="display:inline-flex;align-items:center;gap:4px;
+                  padding:2px 7px;border-radius:999px;
+                  border:1px solid ${categoryColors[r.topScam]||'#888'};font-size:11px;">
+                  <span style="width:7px;height:7px;border-radius:50%;
+                    background:${categoryColors[r.topScam]||'#888'}"></span>
+                  <span>${formatCategoryLabel(r.topScam)}</span>
+                </span>
+              </div>
+              <div style="font-size:11px;color:#888;">Report: cybercrime.gov.in | 1930</div>
             </div>
-            <div style="font-size:11px; color:#7a7067;">Report: cybercrime.gov.in | 1930</div>
-          </div>
-        `);
+          `);
 
-        heatPoints.push([r.lat, r.lng, Math.max(0.3, r.reports / maxReports)]);
-      });
+          heatPoints.push([r.lat, r.lng, Math.max(0.3, r.reports / maxReports)]);
+        });
 
-      L.heatLayer(heatPoints, {
-        radius: 35,
-        blur: 25,
-        maxZoom: 12,
-        gradient: {
-          0.2: "#85c98a",
-          0.5: "#f5c07a",
-          0.8: "#e8918a",
-          1.0: "#c9b8e8",
-        },
-      }).addTo(map);
+        const heatLayer = L.heatLayer(heatPoints, {
+          radius: 35,
+          blur: 25,
+          maxZoom: 12,
+          gradient: {
+            0.2: "#85c98a",
+            0.5: "#f5c07a",
+            0.8: "#e8918a",
+            1.0: "#c9b8e8",
+          },
+        }).addTo(map);
+        window._mapHeatLayer = heatLayer;
+      }
+
+      renderMapData(scamReports);
 
       // Legend overlay
       const legend = document.createElement("div");
@@ -1293,6 +1302,19 @@
         </span>
       `;
       document.getElementById("map").appendChild(legend);
+
+      // Fix initial sizing and handle resizes
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 400);
+
+      const mapSection = document.getElementById("map-section");
+      if (mapSection && window.ResizeObserver) {
+        const ro = new ResizeObserver(() => {
+          map.invalidateSize();
+        });
+        ro.observe(mapSection);
+      }
     })();
 
     // Stats: counter + chart
@@ -1399,6 +1421,103 @@
         });
       });
     })();
+
+    // Live report loading
+    async function loadLiveReports() {
+      try {
+        const res = await fetch(
+          "https://fraudshield-api.azurewebsites.net/api/reports"
+        );
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+
+        if (data.cities && data.cities.length > 0) {
+          scamReports = data.cities;
+
+          const counterEl = document.getElementById("reportsCounter");
+          if (counterEl && data.total) {
+            counterEl.textContent = data.total.toLocaleString("en-IN");
+          }
+
+          const liveBadge = document.getElementById("liveBadge");
+          if (liveBadge && data.live) {
+            liveBadge.textContent = "LIVE DATA";
+            liveBadge.style.color = "#85c98a";
+          }
+
+          if (window._mapMarkersLayer) {
+            window._mapMarkersLayer.clearLayers();
+          }
+          if (window._mapHeatLayer && window._leafletMap) {
+            window._leafletMap.removeLayer(window._mapHeatLayer);
+          }
+          if (typeof window._leafletMap !== "undefined") {
+            // Re-render with latest data
+            (function reRender() {
+              const map = window._leafletMap;
+              if (!map) return;
+              const reports = scamReports;
+              const maxReports = reports.reduce((max, r) => Math.max(max, r.reports), 0) || 1;
+              const markersLayer = L.layerGroup().addTo(map);
+              window._mapMarkersLayer = markersLayer;
+              const heatPoints = [];
+
+              reports.forEach((r) => {
+                const color = (r.reports > 500) ? "#e8918a" : (r.reports >= 200 ? "#f5c07a" : "#85c98a");
+                const minR = 8;
+                const maxR = 28;
+                const radius = minR + (maxR - minR) * (r.reports / maxReports);
+
+                L.circleMarker([r.lat, r.lng], {
+                  radius,
+                  color,
+                  weight: 1.5,
+                  fillColor: color,
+                  fillOpacity: 0.6,
+                }).addTo(markersLayer).bindPopup(`
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;
+                    color:#f0f0f0;background:#111111;border:1px solid rgba(255,255,255,0.1);
+                    padding:8px 10px;">
+                    <div style="font-weight:600;margin-bottom:3px;">${r.city}</div>
+                    <div style="color:#888;margin-bottom:4px;">Reports: <strong style="color:#f0f0f0">${r.reports}</strong></div>
+                    <div style="margin-bottom:4px;">Top scam:
+                      <span style="display:inline-flex;align-items:center;gap:4px;
+                        padding:2px 7px;border-radius:999px;
+                        border:1px solid ${categoryColors[r.topScam]||'#888'};font-size:11px;">
+                        <span style="width:7px;height:7px;border-radius:50%;
+                          background:${categoryColors[r.topScam]||'#888'}"></span>
+                        <span>${formatCategoryLabel(r.topScam)}</span>
+                      </span>
+                    </div>
+                    <div style="font-size:11px;color:#888;">Report: cybercrime.gov.in | 1930</div>
+                  </div>
+                `);
+
+                heatPoints.push([r.lat, r.lng, Math.max(0.3, r.reports / maxReports)]);
+              });
+
+              const heatLayer = L.heatLayer(heatPoints, {
+                radius: 35,
+                blur: 25,
+                maxZoom: 12,
+                gradient: {
+                  0.2: "#85c98a",
+                  0.5: "#f5c07a",
+                  0.8: "#e8918a",
+                  1.0: "#c9b8e8",
+                },
+              }).addTo(map);
+              window._mapHeatLayer = heatLayer;
+            })();
+          }
+        }
+      } catch (e) {
+        console.log("Using seed data:", e.message);
+      }
+    }
+
+    loadLiveReports();
+    setInterval(loadLiveReports, 30000);
   </script>
 </body>
 </html>
