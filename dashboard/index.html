@@ -1,1442 +1,1374 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FraudShield India — Live Threat Intelligence</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<style>
-  :root {
-    --bg: #000000;
-    --indigo-deep: #0A0B14;
-    --accent: #007AFF;           /* SF Blue */
-    --accent-danger: #FF2D55;    /* Ruby Red */
-    --text: #F5F5F7;
-    --muted: #86868b;
-    --panel: rgba(28, 28, 30, 0.5);
-    --radius: 24px;
-  }
-
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-
-  body {
-    min-height: 100vh;
-    color: var(--text);
-    font-family: 'Syne', sans-serif;
-    background:
-      radial-gradient(circle at center, var(--indigo-deep) 0%, #000000 60%),
-      #000000;
-  }
-
-  .app {
-    padding: 40px;
-  }
-
-  .app-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 32px;
-  }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .logo-shield {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    background: radial-gradient(circle at 20% 0%, rgba(255,255,255,0.5), transparent 55%),
-                linear-gradient(135deg, var(--accent), var(--accent-danger));
-  }
-
-  .logo-text {
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.04em;
-  }
-  .logo-text span { color: var(--accent); }
-
-  .header-meta {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-  }
-
-  .live-badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: var(--radius);
-    color: #30D158;
-    background: rgba(0,0,0,0.8);
-    backdrop-filter: blur(24px);
-  }
-  .live-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #30D158;
-  }
-
-  .api-status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: var(--radius);
-    background: rgba(0,0,0,0.8);
-    backdrop-filter: blur(24px);
-  }
-  .api-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-  }
-
-  .header-stat {
-    text-align: right;
-    color: var(--muted);
-  }
-  .header-stat strong {
-    display: block;
-    font-size: 16px;
-    color: var(--accent);
-    font-family: 'Space Mono', monospace;
-  }
-
-  .app-main {
-    display: flex;
-    flex-direction: column;
-    gap: 32px;
-  }
-
-  /* Hero Scam of the Day Stage */
-  .hero-stage {
-    padding: 32px 40px;
-    border-radius: var(--radius);
-    background:
-      radial-gradient(circle, rgba(255,45,85,0.08) 0%, transparent 70%);
-    position: relative;
-    overflow: hidden;
-    text-align: center;
-  }
-
-  .hero-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--accent-danger);
-    margin-bottom: 8px;
-  }
-
-  .hero-title {
-    font-size: 48px;
-    font-weight: 700;
-    letter-spacing: -0.05em;
-    margin-bottom: 16px;
-  }
-
-  .hero-message {
-    max-width: 720px;
-    margin: 0 auto 20px;
-    font-family: 'Space Mono', monospace;
-    font-size: 13px;
-    color: var(--muted);
-  }
-
-  .hero-metrics {
-    display: flex;
-    justify-content: center;
-    gap: 32px;
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .hero-metric strong {
-    display: block;
-    font-size: 16px;
-    color: var(--accent-danger);
-    margin-bottom: 2px;
-  }
-
-  /* Main layer: stats + map */
-  .layer-row {
-    display: grid;
-    grid-template-columns: 1.2fr 1.4fr;
-    gap: 32px;
-  }
-
-  .panel {
-    background: var(--panel);
-    backdrop-filter: blur(50px);
-    border-radius: var(--radius);
-    padding: 20px 24px;
-    border-top: 0.5px solid rgba(255,255,255,0.1);
-    border-left: 0.5px solid rgba(255,255,255,0.08);
-  }
-
-  .stats-panel {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-
-  .stat-total-block {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .stat-total-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    color: var(--muted);
-  }
-  #stat-total {
-    font-size: 64px;
-    font-weight: 700;
-    letter-spacing: -0.08em;
-    color: var(--accent-danger);
-  }
-
-  .stat-row-small {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0,1fr));
-    gap: 12px;
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .stat-small-label {
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    margin-bottom: 2px;
-  }
-  .stat-small-value {
-    font-size: 14px;
-    color: var(--text);
-  }
-
-  .map-panel {
-    position: relative;
-    padding: 0;
-    overflow: hidden;
-  }
-  .map-shell {
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-  #map {
-    width: 100%;
-    height: 320px;
-  }
-  .map-controls {
-    position: absolute;
-    inset: auto 24px 20px 24px;
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-  }
-  .map-btn {
-    padding: 6px 14px;
-    border-radius: var(--radius);
-    border: none;
-    background: rgba(0,0,0,0.7);
-    color: var(--muted);
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    cursor: pointer;
-  }
-  .map-btn.active {
-    background: var(--accent);
-    color: #000;
-  }
-
-  .map-legend {
-    position: absolute;
-    left: 24px;
-    bottom: 24px;
-    padding: 10px 14px;
-    border-radius: var(--radius);
-    background: rgba(0,0,0,0.75);
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-  }
-  .legend-title {
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--muted);
-    margin-bottom: 6px;
-  }
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
-  }
-  .legend-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-  }
-
-  /* Second layer: feed, tabs, tester */
-  .lower-layer {
-    display: grid;
-    grid-template-columns: 1.4fr 1.2fr;
-    gap: 32px;
-  }
-
-  .feed-title {
-    font-size: 14px;
-    font-weight: 600;
-    margin-bottom: 8px;
-  }
-
-  .feed-meta {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    color: var(--muted);
-    margin-bottom: 12px;
-  }
-
-  #tab-feed {
-    max-height: 260px;
-    overflow-y: auto;
-  }
-
-  .feed-item {
-    padding: 10px 12px;
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: background 0.16s ease;
-    margin-bottom: 6px;
-  }
-  .feed-item:hover {
-    background: rgba(255,255,255,0.04);
-  }
-  .feed-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 4px;
-  }
-  .feed-category {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    padding: 3px 8px;
-    border-radius: var(--radius);
-  }
-  .cat-fake_cashback,
-  .cat-kyc_freeze,
-  .cat-job_scam,
-  .cat-govt_impersonation {
-    background: rgba(0,122,255,0.18);
-    color: var(--accent);
-  }
-  .cat-digital_arrest,
-  .cat-phishing_link {
-    background: rgba(255,45,85,0.16);
-    color: var(--accent-danger);
-  }
-  .cat-lottery_scam,
-  .cat-legitimate {
-    background: rgba(48,209,88,0.16);
-    color: #30D158;
-  }
-
-  .feed-time,
-  .feed-location,
-  .feed-upi {
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .feed-location strong {
-    color: var(--text);
-  }
-
-  .feed-conf {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 6px;
-  }
-  .conf-bar {
-    flex: 1;
-    height: 3px;
-    border-radius: var(--radius);
-    background: rgba(255,255,255,0.06);
-    overflow: hidden;
-  }
-  .conf-fill {
-    height: 100%;
-    border-radius: var(--radius);
-    background: linear-gradient(90deg, var(--accent-danger), var(--accent));
-  }
-  .conf-pct {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    color: var(--muted);
-  }
-
-  .right-column {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-  }
-
-  .tabs-panel {
-    padding-bottom: 0;
-  }
-
-  .sidebar-tabs {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 10px;
-  }
-  .tab {
-    flex: 1;
-    border-radius: var(--radius);
-    border: none;
-    background: transparent;
-    color: var(--muted);
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    padding: 8px 10px;
-    cursor: pointer;
-  }
-  .tab.active {
-    background: rgba(255,255,255,0.08);
-    color: var(--accent);
-  }
-
-  .tab-content {
-    display: none;
-    padding-bottom: 16px;
-  }
-  .tab-content.active {
-    display: block;
-  }
-
-  #network-canvas {
-    width: 100%;
-    height: 220px;
-    border-radius: var(--radius);
-    background: #05060A;
-  }
-
-  /* Tester */
-  .tester-section {
-    padding: 20px 22px;
-  }
-  .tester-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-  .tester-badge {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    padding: 4px 10px;
-    border-radius: var(--radius);
-    background: rgba(0,0,0,0.8);
-    color: var(--accent);
-  }
-  .tester-title {
-    font-size: 14px;
-    font-weight: 600;
-  }
-  .tester-sub {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    color: var(--muted);
-  }
-
-  .tester-grid {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 8px;
-  }
-  .tester-input-wrap {
-    flex: 1;
-  }
-  .tester-textarea {
-    width: 100%;
-    height: 48px;
-    border-radius: var(--radius);
-    border: none;
-    padding: 12px 14px;
-    font-family: 'Space Mono', monospace;
-    font-size: 12px;
-    color: var(--text);
-    background: rgba(5,5,7,0.9);
-  }
-  .tester-textarea::placeholder {
-    color: var(--muted);
-  }
-
-  .tester-btn {
-    border-radius: var(--radius);
-    border: none;
-    padding: 12px 20px;
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    background: var(--accent);
-    color: #000;
-    cursor: pointer;
-  }
-
-  .tester-examples {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 8px;
-  }
-  .example-chip {
-    border-radius: var(--radius);
-    padding: 4px 10px;
-    border: none;
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    background: rgba(255,255,255,0.04);
-    color: var(--muted);
-    cursor: pointer;
-  }
-
-  .tester-result {
-    margin-top: 10px;
-    padding: 12px 14px;
-    border-radius: var(--radius);
-    background: rgba(0,0,0,0.8);
-    display: none;
-  }
-  .tester-result.visible {
-    display: block;
-  }
-
-  .tester-loading {
-    display: none;
-    margin-top: 8px;
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-    gap: 8px;
-    align-items: center;
-  }
-  .tester-loading.visible {
-    display: flex;
-  }
-
-  /* Evolution list */
-  .evolution-section {
-    padding: 22px 24px;
-  }
-  .evolution-title {
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 6px;
-  }
-  .evolution-heading {
-    font-size: 20px;
-    font-weight: 600;
-    margin-bottom: 10px;
-  }
-  .evolution-sub {
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .evolution-cards {
-    margin-top: 14px;
-    display: grid;
-    gap: 10px;
-  }
-  .evo-card {
-    border-radius: var(--radius);
-    padding: 12px 14px;
-    background: rgba(255,255,255,0.03);
-  }
-  .evo-top {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    align-items: baseline;
-  }
-  .evo-pair {
-    font-size: 14px;
-    letter-spacing: -0.02em;
-  }
-  .evo-pair span {
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .evo-score {
-    font-family: 'Space Mono', monospace;
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .evo-score strong {
-    color: var(--accent);
-  }
-  .evo-meta {
-    margin-top: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-  }
-  .evo-overlap {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-  .evolution-bar {
-    position: relative;
-    width: 180px;
-    height: 6px;
-    border-radius: var(--radius);
-    background: rgba(255,255,255,0.08);
-    overflow: hidden;
-  }
-  .evolution-bar-fill {
-    position: absolute;
-    inset: 0;
-    border-radius: var(--radius);
-    background: linear-gradient(90deg, var(--accent), var(--accent-danger));
-  }
-  .evolution-bar-fill.low {
-    background: linear-gradient(90deg, rgba(0,122,255,0.7), rgba(0,122,255,0.4));
-  }
-
-  /* Leaflet overrides */
-  .leaflet-container {
-    background: #000000 !important;
-  }
-  .leaflet-tile {
-    filter: grayscale(1);
-  }
-
-  @media (max-width: 1200px) {
-    .layer-row,
-    .lower-layer {
-      grid-template-columns: 1fr;
+  <meta charset="UTF-8" />
+  <title>FraudShield India — SMS Scam Detector</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <style>
+    :root {
+      --bg-black: #0a0a0a;
+      --bg-dark-1: #0f0f0f;
+      --bg-dark-2: #111111;
+      --bg-dark-3: #181818;
+      --text-main: #ffffff;
+      --text-muted: #888888;
+      --border-subtle: rgba(255, 255, 255, 0.2);
+      --accent-danger: #ef4444;
+      --accent-safe: #16a34a;
+      --pill-bg: #181818;
+      --card-bg: #101010;
+      --step-border: #222222;
     }
-  }
-</style>
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      scroll-behavior: smooth;
+      background-color: var(--bg-black);
+      color: var(--text-main);
+      font-family: "IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    main {
+      width: 100%;
+      min-height: 100vh;
+      background-color: var(--bg-black);
+    }
+
+    .section {
+      padding: 72px 24px;
+    }
+
+    .max-width {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh;
+      background-color: var(--bg-black);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .hero-inner {
+      text-align: left;
+      width: 100%;
+    }
+
+    .hero-label {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #ffffff;
+      margin-bottom: 16px;
+      opacity: 0.9;
+    }
+
+    .hero-heading {
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      font-weight: 800;
+      font-size: clamp(40px, 4.1vw, 52px);
+      line-height: 1.1;
+      margin-bottom: 16px;
+      color: #ffffff;
+      max-width: 560px;
+    }
+
+    .hero-subheading {
+      font-size: 15px;
+      color: var(--text-muted);
+      max-width: 520px;
+      margin-bottom: 28px;
+    }
+
+    .hero-input-card {
+      background-color: var(--bg-dark-3);
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 18px 18px 16px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(10px);
+    }
+
+    .hero-textarea {
+      width: 100%;
+      min-height: 110px;
+      resize: vertical;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #ffffff;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .hero-textarea::placeholder {
+      color: #555555;
+    }
+
+    .hero-input-footer {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background-color: #141414;
+      color: #dddddd;
+      cursor: pointer;
+      transition: background-color 0.18s ease, color 0.18s ease, transform 0.12s ease, border-color 0.18s ease;
+      white-space: nowrap;
+    }
+
+    .chip:hover {
+      background-color: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .analyze-btn {
+      margin-left: auto;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 9px 18px;
+      border-radius: 10px;
+      border: none;
+      background-color: #ffffff;
+      color: #000000;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background-color 0.18s ease, color 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease, opacity 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .analyze-btn:hover:not(:disabled) {
+      background-color: #f5f5f5;
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
+    }
+
+    .analyze-btn:disabled {
+      opacity: 0.6;
+      cursor: default;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .analyze-btn span.dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background-color: #000000;
+    }
+
+    .result-container {
+      margin-top: 18px;
+      min-height: 0;
+    }
+
+    .result-card {
+      border-radius: 14px;
+      padding: 14px 14px 13px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background-color: rgba(16, 16, 16, 0.96);
+      display: none;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .result-card.show {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .result-card.scam {
+      background-color: rgba(127, 29, 29, 0.3);
+      border-color: rgba(248, 113, 113, 0.6);
+    }
+
+    .result-card.safe {
+      background-color: rgba(22, 101, 52, 0.3);
+      border-color: rgba(74, 222, 128, 0.6);
+    }
+
+    .result-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .result-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .result-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 11px;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .badge {
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 11px;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .badge-label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background-color: #ffffff;
+    }
+
+    .badge-risk {
+      text-transform: uppercase;
+    }
+
+    .result-body {
+      font-size: 12px;
+      color: #dddddd;
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pill {
+      font-size: 11px;
+      padding: 3px 8px;
+      background-color: rgba(24, 24, 24, 0.9);
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      color: #e5e7eb;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      white-space: nowrap;
+    }
+
+    .result-error {
+      font-size: 12px;
+      color: #f97373;
+    }
+
+    /* Scroll hint */
+    .scroll-hint {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.18s ease;
+    }
+
+    .scroll-hint:hover {
+      opacity: 1;
+    }
+
+    .scroll-hint svg {
+      width: 18px;
+      height: 18px;
+      fill: #ffffff;
+      animation: bounce 1.6s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% {
+        transform: translate(-50%, 0);
+      }
+      50% {
+        transform: translate(-50%, 6px);
+      }
+    }
+
+    /* SECTION 2 – MAP */
+    .section-map {
+      background-color: var(--bg-dark-1);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+    }
+
+    .section-label {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    #map {
+      width: 100%;
+      height: clamp(380px, 70vh, 520px);
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid #202020;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.9);
+      position: relative;
+    }
+
+    .map-legend {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 6px 8px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color: #e5e5e5;
+      pointer-events: none;
+      z-index: 500;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+
+    .map-note {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #666;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    /* SECTION 3 – STATS + CATEGORIES */
+    .section-stats {
+      background-color: #111111;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+      gap: 40px;
+      align-items: center;
+    }
+
+    .counter-label {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #e5e5e5;
+      margin-bottom: 8px;
+    }
+
+    .counter-value {
+      font-size: 40px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      margin-bottom: 14px;
+    }
+
+    .counter-subtext {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .stat-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .stat-pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid #262626;
+      background-color: #151515;
+      font-size: 11px;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color: #e5e5e5;
+    }
+
+    .chart-card {
+      background-color: #151515;
+      border-radius: 16px;
+      border: 1px solid #262626;
+      padding: 18px 18px 14px;
+    }
+
+    .chart-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 260px;
+      margin: 0 auto;
+    }
+
+    .chart-legend {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 4px 8px;
+      font-size: 11px;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color: #d4d4d4;
+    }
+
+    .chart-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chart-legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+
+    /* SECTION 4 – HOW IT WORKS */
+    .section-how {
+      background-color: #000000;
+    }
+
+    .how-title {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .how-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .how-card {
+      border-radius: 14px;
+      border: 1px solid var(--step-border);
+      background-color: #080808;
+      padding: 18px 16px 16px;
+    }
+
+    .how-step {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #a1a1aa;
+      margin-bottom: 6px;
+    }
+
+    .how-heading {
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+
+    .how-body {
+      font-size: 13px;
+      color: #a3a3a3;
+    }
+
+    /* SECTION 5 – SCAM EVOLUTION TABLE */
+    .section-table {
+      background-color: #0f0f0f;
+    }
+
+    .table-title {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .table-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+      max-width: 640px;
+    }
+
+    .evolution-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid #1f2933;
+      background-color: #050505;
+    }
+
+    .evolution-table thead {
+      background-color: #020617;
+    }
+
+    .evolution-table th,
+    .evolution-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid #1f2933;
+    }
+
+    .evolution-table th {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #9ca3af;
+    }
+
+    .evolution-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .similarity-score {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color: #fecaca;
+    }
+
+    .similarity-badge {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(248, 113, 113, 0.7);
+      color: #fecaca;
+      background-color: rgba(127, 29, 29, 0.4);
+    }
+
+    .bar-cell {
+      width: 180px;
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background-color: #111827;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background-color: #ef4444;
+      width: 0;
+      transition: width 0.8s ease-out;
+    }
+
+    /* SECTION 6 – FOOTER */
+    .section-footer {
+      background-color: #000000;
+      border-top: 1px solid #1f2933;
+      padding-top: 24px;
+      padding-bottom: 18px;
+    }
+
+    .footer-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .logo-mark {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-hex {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+      position: relative;
+      transform: rotate(45deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .logo-hex::before {
+      content: "";
+      position: absolute;
+      inset: 4px;
+      border-radius: 4px;
+      border: 1px solid rgba(229, 231, 235, 0.4);
+    }
+
+    .logo-text {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .footer-bottom {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #e5e5e5;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      text-align: center;
+    }
+
+    /* Responsive */
+    @media (max-width: 880px) {
+      .stats-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .how-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .hero-inner {
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .section {
+        padding-inline: 18px;
+      }
+
+      .hero-input-footer {
+        align-items: flex-start;
+      }
+
+      .analyze-btn {
+        width: 100%;
+        justify-content: center;
+        margin-left: 0;
+      }
+
+      .footer-main {
+        align-items: flex-start;
+      }
+    }
+  </style>
 </head>
 <body>
-
-<div class="app">
-  <header class="app-header">
-    <div class="logo">
-      <div class="logo-shield">🛡</div>
-      <div>
-        <div class="logo-text">Fraud<span>Shield</span> India</div>
-        <div style="font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:0.16em;text-transform:uppercase;">
-          Threat Intelligence Dashboard
-        </div>
-      </div>
-    </div>
-    <div class="header-meta">
-      <div class="live-badge">
-        <div class="live-dot"></div>
-        LIVE
-      </div>
-      <div id="api-status" class="api-status checking">
-        <div class="api-dot"></div>
-        <span id="api-status-text">CHECKING...</span>
-      </div>
-      <div class="header-stat">
-        <strong id="total-counter">0</strong>
-        scams today
-      </div>
-      <div class="header-stat">
-        <strong id="blocked-counter">0</strong>
-        blocked
-      </div>
-      <div style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;">
-        MIT Manipal · AI Unlocked 2025
-      </div>
-    </div>
-  </header>
-
-  <main class="app-main">
-    <!-- Hero Scam of the Day -->
-    <section class="hero-stage">
-      <div class="hero-label">Scam of the Day</div>
-      <h1 class="hero-title" id="sotd-title">Digital Arrest Scam — Most Dangerous Today</h1>
-      <p class="hero-message" id="sotd-msg">
-        "CBI officer here. Your Aadhaar linked to money laundering. Transfer Rs.50,000 or face arrest immediately."
-      </p>
-      <div class="hero-metrics">
-        <div class="hero-metric">
-          <strong id="sotd-count">634</strong>
-          reports today
-        </div>
-        <div class="hero-metric">
-          <strong>99%</strong>
-          confidence
-        </div>
-        <div class="hero-metric">
-          <strong>₹1.2Cr</strong>
-          avg loss
-        </div>
-      </div>
-    </section>
-
-    <!-- Layer: stats + map -->
-    <section class="layer-row">
-      <div class="panel stats-panel">
-        <div class="stat-total-block">
-          <div class="stat-total-label">Total Scams</div>
-          <div id="stat-total">2,847</div>
-        </div>
-        <div class="stat-row-small">
-          <div>
-            <div class="stat-small-label">Digital Arrest</div>
-            <div class="stat-small-value" id="stat-arrest">634</div>
-          </div>
-          <div>
-            <div class="stat-small-label">Fake Cashback</div>
-            <div class="stat-small-value" id="stat-cashback">891</div>
-          </div>
-          <div>
-            <div class="stat-small-label">KYC Freeze</div>
-            <div class="stat-small-value" id="stat-kyc">421</div>
-          </div>
-        </div>
-        <div class="stat-row-small">
-          <div>
-            <div class="stat-small-label">Amount Saved</div>
-            <div class="stat-small-value">₹4.2Cr</div>
-          </div>
-          <div>
-            <div class="stat-small-label">Model Accuracy</div>
-            <div class="stat-small-value">96.4%</div>
-          </div>
-          <div>
-            <div class="stat-small-label">Model</div>
-            <div class="stat-small-value">Azure o4-mini</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel map-panel">
-        <div class="map-shell">
-          <div id="map"></div>
-        </div>
-        <div class="map-controls">
-          <button class="map-btn active" onclick="setLayer('heat')">HEATMAP</button>
-          <button class="map-btn" onclick="setLayer('markers')">MARKERS</button>
-          <button class="map-btn" onclick="setLayer('both')">BOTH</button>
-        </div>
-        <div class="map-legend">
-          <div class="legend-title">Scam Intensity</div>
-          <div class="legend-item">
-            <div class="legend-dot" style="background:#ff2d55"></div> Critical (50+)
-          </div>
-          <div class="legend-item">
-            <div class="legend-dot" style="background:#007aff"></div> High (20–50)
-          </div>
-          <div class="legend-item">
-            <div class="legend-dot" style="background:#ffd60a"></div> Medium (5–20)
-          </div>
-          <div class="legend-item">
-            <div class="legend-dot" style="background:#30d158"></div> Low (&lt;5)
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Layer: feed + tabs/tester -->
-    <section class="lower-layer">
-      <div class="panel">
-        <div class="feed-title">Live Scam Feed</div>
-        <div class="feed-meta">Last few minutes · Highest-risk SMS scams detected across India</div>
-        <div id="tab-feed"></div>
-      </div>
-
-      <div class="right-column">
-        <div class="panel tabs-panel">
-          <div class="sidebar-tabs">
-            <button class="tab active" onclick="switchTab('feed', this)">Feed</button>
-            <button class="tab" onclick="switchTab('network', this)">Network</button>
-            <button class="tab" onclick="switchTab('stats', this)">Category</button>
-          </div>
-          <div class="tab-content active" id="tab-feed"></div>
-          <div class="tab-content" id="tab-network">
-            <canvas id="network-canvas"></canvas>
-          </div>
-          <div class="tab-content" id="tab-stats"></div>
-        </div>
-
-        <div class="panel tester-section">
-          <div class="tester-header">
-            <div class="tester-badge">⚡ Live</div>
-            <div>
-              <div class="tester-title">Real-Time Scam Analyzer</div>
-              <div class="tester-sub">Paste any SMS · Classified via Azure OpenAI o4-mini</div>
+  <main>
+    <!-- SECTION 1: HERO -->
+    <section class="section hero" id="hero">
+      <div class="max-width hero-inner">
+        <div class="hero-label">FRAUDSHIELD INDIA</div>
+        <h1 class="hero-heading">Is this message a scam?</h1>
+        <p class="hero-subheading">
+          Paste any SMS in Hindi, Hinglish, or English. Instant AI detection.
+        </p>
+        <div class="hero-input-card">
+          <textarea
+            id="messageInput"
+            class="hero-textarea"
+            placeholder="Paste suspicious message here..."
+          ></textarea>
+          <div class="hero-input-footer">
+            <div class="chip-row" id="exampleChips">
+              <button class="chip" data-example="प्रिय ग्राहक, आपका KYC अधूरा है। अपना खाता बंद होने से बचाने के लिए तुरंत इस लिंक पर क्लिक करें: http://kyc-update-in.xyz">KYC Freeze</button>
+              <button class="chip" data-example="Congratulations! You have won ₹25,00,000 in Jio Diwali Lucky Draw. To claim now, call this number and pay processing fee.">Fake Cashback</button>
+              <button class="chip" data-example="This is Cyber Crime Police. आपके खिलाफ गिरफ़्तारी वारंट जारी है। तुरंत इस नंबर पर वीडियो कॉल करें, नहीं तो डिजिटल गिरफ्तारी होगी।">Digital Arrest</button>
+              <button class="chip" data-example="Dear user, part-time job work from home. Earn ₹5,000 daily by liking YouTube videos. Message us on WhatsApp to start now.">Job Scam</button>
+              <button class="chip" data-example="Dear customer, your electricity bill has been paid successfully. Thank you for using our official app.">Legitimate</button>
             </div>
+            <button id="analyzeButton" class="analyze-btn">
+              <span class="dot"></span>
+              ANALYZE
+            </button>
           </div>
-
-          <div class="tester-grid">
-            <div class="tester-input-wrap">
-              <input
-                class="tester-textarea"
-                id="tester-input"
-                placeholder="Paste any suspicious SMS here..."
-              />
-              <div class="tester-examples">
-                <span class="example-chip" onclick="fillExample('cashback')">💸 Cashback</span>
-                <span class="example-chip" onclick="fillExample('arrest')">🚔 Arrest</span>
-                <span class="example-chip" onclick="fillExample('kyc')">🏦 KYC</span>
-                <span class="example-chip" onclick="fillExample('job')">💼 Job</span>
-                <span class="example-chip" onclick="fillExample('legit')">✅ Legit</span>
+          <div class="result-container">
+            <div id="resultCard" class="result-card">
+              <div class="result-header">
+                <div class="result-title" id="resultTitle">Result</div>
+                <div class="result-meta">
+                  <span class="badge" id="categoryBadge" style="display:none;">
+                    <span class="badge-dot"></span>
+                    <span class="badge-label" id="categoryLabel"></span>
+                  </span>
+                  <span class="badge" id="riskBadge" style="display:none;">
+                    <span class="badge-label badge-risk" id="riskLabel"></span>
+                  </span>
+                  <span class="badge" id="confidenceBadge" style="display:none;">
+                    <span class="badge-label" id="confidenceLabel"></span>
+                  </span>
+                </div>
               </div>
+              <div class="result-body" id="resultExplanation"></div>
+              <div class="pill-row" id="redFlagsRow"></div>
+              <div class="result-error" id="resultError" style="display:none;"></div>
             </div>
-            <button class="tester-btn" id="tester-btn" onclick="analyzeMessage()">Analyze →</button>
           </div>
+        </div>
+      </div>
+      <div class="scroll-hint" id="scrollHint">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 16.5c-.256 0-.512-.098-.707-.293l-5-5 1.414-1.414L12 14.086l4.293-4.293 1.414 1.414-5 5A1 1 0 0 1 12 16.5z" />
+        </svg>
+      </div>
+    </section>
 
-          <div class="tester-loading" id="tester-loading">
-            <span>• • •</span>
-            Analyzing with Azure OpenAI o4-mini...
+    <!-- SECTION 2: INDIA FRAUD HOTSPOT MAP -->
+    <section class="section section-map" id="map-section">
+      <div class="max-width">
+        <div class="section-label">FRAUD HOTSPOTS</div>
+        <div id="map"></div>
+        <div class="map-note">Synthetic illustrative data for demo. Report: cybercrime.gov.in | 1930</div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: STATS + CATEGORIES -->
+    <section class="section section-stats" id="stats-section">
+      <div class="max-width">
+        <div class="stats-grid">
+          <div>
+            <div class="counter-label">REPORTS TRACKED</div>
+            <div class="counter-value" id="reportsCounter">0</div>
+            <div class="counter-subtext">
+              Aggregated synthetic reports across major Indian cities to stress-test FraudShield India's detection engine.
+            </div>
+            <div class="stat-pills">
+              <div class="stat-pill">100% Accuracy</div>
+              <div class="stat-pill">8 Categories</div>
+              <div class="stat-pill">3 Languages</div>
+            </div>
           </div>
-
-          <div class="tester-result" id="tester-result"></div>
+          <div>
+            <div class="chart-card">
+              <div class="chart-title">Scam category breakdown</div>
+              <div class="chart-wrapper">
+                <canvas id="categoryChart"></canvas>
+              </div>
+              <div class="chart-legend" id="chartLegend"></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Evolution -->
-    <section class="panel evolution-section">
-      <div class="evolution-title">Scam Evolution — Pattern Inheritance (2020–2025)</div>
-      <div class="evolution-heading">How new SMS scams inherit structure from older playbooks</div>
-      <div class="evolution-sub">
-        Cosine similarity between template embeddings (text-embedding-3-small, Azure OpenAI).
-        Pairs with similarity &gt; 0.82 flagged as <span style="color:var(--accent);">HIGH SIMILARITY</span>.
-      </div>
-
-      <div class="evolution-cards">
-        <div class="evo-card">
-          <div class="evo-top">
-            <div class="evo-pair">KBC Lottery 2020 <span>→</span> Jio Lucky Draw 2021</div>
-            <div class="evo-score"><strong>0.89</strong> · HIGH</div>
+    <!-- SECTION 4: HOW IT WORKS -->
+    <section class="section section-how" id="how-section">
+      <div class="max-width">
+        <div class="how-title">HOW FRAUDSHIELD INDIA WORKS</div>
+        <div class="how-grid">
+          <div class="how-card">
+            <div class="how-step">01 — RECEIVE</div>
+            <div class="how-heading">SMS &amp; chat intake</div>
+            <div class="how-body">
+              SMS arrives on your Android device or Telegram message. FraudShield listens via lightweight connectors without storing your contacts or media.
+            </div>
           </div>
-          <div class="evo-meta">
-            <div class="evo-overlap">Pattern overlap</div>
-            <div class="evolution-bar"><div class="evolution-bar-fill" style="width:89%;"></div></div>
+          <div class="how-card">
+            <div class="how-step">02 — ANALYZE</div>
+            <div class="how-heading">Azure o4-mini classifier</div>
+            <div class="how-body">
+              Azure OpenAI o4-mini classifies in milliseconds across 8 scam types, combining pattern libraries with live fraud intelligence from Indian incident reports.
+            </div>
           </div>
-        </div>
-
-        <div class="evo-card">
-          <div class="evo-top">
-            <div class="evo-pair">KBC Lottery 2020 <span>→</span> Fake Cashback 2022</div>
-            <div class="evo-score">0.77</div>
-          </div>
-          <div class="evo-meta">
-            <div class="evo-overlap">Pattern overlap</div>
-            <div class="evolution-bar"><div class="evolution-bar-fill low" style="width:77%;"></div></div>
+          <div class="how-card">
+            <div class="how-step">03 — PROTECT</div>
+            <div class="how-heading">Hindi-first alerting</div>
+            <div class="how-body">
+              Instant Hindi alert with red flags, scam explanation, and cybercrime.gov.in pre-fill so victims can file FIR-grade reports in under two minutes.
+            </div>
           </div>
         </div>
-
-        <div class="evo-card">
-          <div class="evo-top">
-            <div class="evo-pair">KBC Lottery 2020 <span>→</span> KYC Freeze 2023</div>
-            <div class="evo-score">0.74</div>
-          </div>
-          <div class="evo-meta">
-            <div class="evo-overlap">Pattern overlap</div>
-            <div class="evolution-bar"><div class="evolution-bar-fill low" style="width:74%;"></div></div>
-          </div>
-        </div>
-
-        <div class="evo-card">
-          <div class="evo-top">
-            <div class="evo-pair">Fake Cashback 2022 <span>→</span> Digital Arrest 2024</div>
-            <div class="evo-score"><strong>0.83</strong> · HIGH</div>
-          </div>
-          <div class="evo-meta">
-            <div class="evo-overlap">Pattern overlap</div>
-            <div class="evolution-bar"><div class="evolution-bar-fill" style="width:83%;"></div></div>
-          </div>
-        </div>
-
-        <div class="evo-card">
-          <div class="evo-top">
-            <div class="evo-pair">Fake Cashback 2022 <span>→</span> E‑Challan Phishing 2025</div>
-            <div class="evo-score"><strong>0.84</strong> · HIGH</div>
-          </div>
-          <div class="evo-meta">
-            <div class="evo-overlap">Pattern overlap</div>
-            <div class="evolution-bar"><div class="evolution-bar-fill" style="width:84%;"></div></div>
-          </div>
-        </div>
-
-        <div class="evo-card">
-          <div class="evo-top">
-            <div class="evo-pair">KYC Freeze 2023 <span>→</span> Digital Arrest 2024</div>
-            <div class="evo-score"><strong>0.86</strong> · HIGH</div>
-          </div>
-          <div class="evo-meta">
-            <div class="evo-overlap">Pattern overlap</div>
-            <div class="evolution-bar"><div class="evolution-bar-fill" style="width:86%;"></div></div>
-          </div>
-        </div>
-
-        <div class="evo-card">
-          <div class="evo-top">
-            <div class="evo-pair">Digital Arrest 2024 <span>→</span> E‑Challan Phishing 2025</div>
-            <div class="evo-score"><strong>0.82</strong> · HIGH</div>
-          </div>
-          <div class="evo-meta">
-            <div class="evo-overlap">Pattern overlap</div>
-            <div class="evolution-bar"><div class="evolution-bar-fill" style="width:82%;"></div></div>
-          </div>
-        </div>
-      </div>
-      <div class="evolution-footnote" style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);margin-top:10px;">
-        FraudShield detects new scam variants because they inherit patterns from older scams (similarity &gt; 0.82).
       </div>
     </section>
+
+    <!-- SECTION 5: SCAM EVOLUTION TABLE -->
+    <section class="section section-table" id="evolution-section">
+      <div class="max-width">
+        <div class="table-title">SCAM EVOLUTION 2020–2025</div>
+        <div class="table-subtitle">
+          How new scams inherit patterns from older playbooks — cosine similarity via Azure OpenAI embeddings.
+        </div>
+        <div class="table-wrapper">
+          <table class="evolution-table">
+            <thead>
+              <tr>
+                <th>Template A</th>
+                <th>Template B</th>
+                <th>Similarity</th>
+                <th>Risk</th>
+                <th class="bar-cell">Pattern overlap</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>KBC Lottery 2020</td>
+                <td>Jio Lucky Draw 2021</td>
+                <td class="similarity-score">0.89</td>
+                <td><span class="similarity-badge">HIGH</span></td>
+                <td class="bar-cell">
+                  <div class="bar-track">
+                    <div class="bar-fill" data-score="0.89"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Fake Cashback 2022</td>
+                <td>Digital Arrest 2024</td>
+                <td class="similarity-score">0.83</td>
+                <td><span class="similarity-badge">HIGH</span></td>
+                <td class="bar-cell">
+                  <div class="bar-track">
+                    <div class="bar-fill" data-score="0.83"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>KYC Freeze 2023</td>
+                <td>Digital Arrest 2024</td>
+                <td class="similarity-score">0.86</td>
+                <td><span class="similarity-badge">HIGH</span></td>
+                <td class="bar-cell">
+                  <div class="bar-track">
+                    <div class="bar-fill" data-score="0.86"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Fake Cashback 2022</td>
+                <td>E-Challan Phishing 2025</td>
+                <td class="similarity-score">0.84</td>
+                <td><span class="similarity-badge">HIGH</span></td>
+                <td class="bar-cell">
+                  <div class="bar-track">
+                    <div class="bar-fill" data-score="0.84"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Digital Arrest 2024</td>
+                <td>E-Challan Phishing 2025</td>
+                <td class="similarity-score">0.82</td>
+                <td><span class="similarity-badge">HIGH</span></td>
+                <td class="bar-cell">
+                  <div class="bar-track">
+                    <div class="bar-fill" data-score="0.82"></div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 6: FOOTER -->
+    <footer class="section section-footer" id="footer">
+      <div class="max-width">
+        <div class="footer-main">
+          <div class="logo-mark">
+            <div class="logo-hex"></div>
+            <div class="logo-text">FRAUDSHIELD INDIA</div>
+          </div>
+          <div>
+            Powered by Azure Functions · Azure OpenAI · Azure AI Language · Cosmos DB
+          </div>
+          <div>
+            MIT Manipal · AI Unlocked 2025 · Boulevard of Secure Dreams
+          </div>
+        </div>
+        <div class="footer-bottom">
+          Emergency: 1930 | cybercrime.gov.in
+        </div>
+      </div>
+    </footer>
   </main>
-</div>
 
-<script>
-const HOTSPOTS = [
-  [28.6139,77.2090,1.0,"New Delhi","Delhi",523,"digital_arrest"],
-  [19.0760,72.8777,0.95,"Mumbai","Maharashtra",487,"fake_cashback"],
-  [12.9716,77.5946,0.85,"Bengaluru","Karnataka",412,"phishing_link"],
-  [22.5726,88.3639,0.80,"Kolkata","West Bengal",389,"kyc_freeze"],
-  [17.3850,78.4867,0.75,"Hyderabad","Telangana",356,"job_scam"],
-  [13.0827,80.2707,0.72,"Chennai","Tamil Nadu",334,"govt_impersonation"],
-  [23.0225,72.5714,0.68,"Ahmedabad","Gujarat",298,"fake_cashback"],
-  [26.8467,80.9462,0.65,"Lucknow","Uttar Pradesh",276,"lottery_scam"],
-  [18.5204,73.8567,0.62,"Pune","Maharashtra",254,"phishing_link"],
-  [26.9124,75.7873,0.60,"Jaipur","Rajasthan",234,"kyc_freeze"],
-  [25.5941,85.1376,0.58,"Patna","Bihar",218,"digital_arrest"],
-  [21.1458,79.0882,0.55,"Nagpur","Maharashtra",198,"fake_cashback"],
-  [30.7333,76.7794,0.52,"Chandigarh","Punjab",187,"job_scam"],
-  [23.2599,77.4126,0.50,"Bhopal","Madhya Pradesh",175,"govt_impersonation"],
-  [22.7196,75.8577,0.48,"Indore","Madhya Pradesh",164,"lottery_scam"],
-  [27.1767,78.0081,0.45,"Agra","Uttar Pradesh",152,"digital_arrest"],
-  [15.2993,74.1240,0.42,"Goa","Goa",98,"phishing_link"],
-  [8.5241,76.9366,0.40,"Thiruvananthapuram","Kerala",87,"kyc_freeze"],
-  [20.9374,85.0900,0.38,"Bhubaneswar","Odisha",76,"fake_cashback"],
-  [26.1445,91.7362,0.35,"Guwahati","Assam",65,"job_scam"],
-];
+  <!-- Scripts -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    // Shared data
+    const scamReports = [
+      { city:"Mumbai", lat:19.076, lng:72.8777, reports:847, topScam:"fake_cashback" },
+      { city:"Delhi", lat:28.6139, lng:77.209, reports:723, topScam:"digital_arrest" },
+      { city:"Bangalore", lat:12.9716, lng:77.5946, reports:534, topScam:"job_scam" },
+      { city:"Hyderabad", lat:17.385, lng:78.4867, reports:412, topScam:"kyc_freeze" },
+      { city:"Chennai", lat:13.0827, lng:80.2707, reports:389, topScam:"phishing_link" },
+      { city:"Kolkata", lat:22.5726, lng:88.3639, reports:298, topScam:"lottery_scam" },
+      { city:"Pune", lat:18.5204, lng:73.8567, reports:267, topScam:"fake_cashback" },
+      { city:"Ahmedabad", lat:23.0225, lng:72.5714, reports:234, topScam:"govt_impersonation" },
+      { city:"Jaipur", lat:26.9124, lng:75.7873, reports:198, topScam:"digital_arrest" },
+      { city:"Lucknow", lat:26.8467, lng:80.9462, reports:176, topScam:"kyc_freeze" },
+      { city:"Chandigarh", lat:30.7333, lng:76.7794, reports:145, topScam:"job_scam" },
+      { city:"Bhopal", lat:23.2599, lng:77.4126, reports:123, topScam:"phishing_link" },
+      { city:"Patna", lat:25.6093, lng:85.1376, reports:156, topScam:"lottery_scam" },
+      { city:"Kochi", lat:9.9312, lng:76.2673, reports:98, topScam:"fake_cashback" },
+      { city:"Guwahati", lat:26.1445, lng:91.7362, reports:87, topScam:"digital_arrest" },
+      { city:"Manipal", lat:13.3525, lng:74.786, reports:45, topScam:"job_scam" },
+    ];
 
-const SCAM_NETWORK = {
-  nodes: [
-    {id:"ph3",label:"+91-98765-00003",type:"phone",x:120,y:80},
-    {id:"upi4",label:"cashback@okaxis",type:"upi",cat:"fake_cashback",x:60,y:160},
-    {id:"upi7",label:"refund@paytm",type:"upi",cat:"fake_cashback",x:120,y:200},
-    {id:"upi13",label:"doubleincome@ybl",type:"ring",cat:"fake_cashback",x:180,y:160},
-    {id:"ph1",label:"+91-98765-00001",type:"phone",x:280,y:80},
-    {id:"upi1",label:"taskpay@ybl",type:"upi",cat:"job_scam",x:240,y:160},
-    {id:"upi8",label:"yt.task@ybl",type:"upi",cat:"job_scam",x:300,y:160},
-    {id:"ph4",label:"+91-98765-00004",type:"phone",x:120,y:300},
-    {id:"upi5",label:"cbi.penalty@upi",type:"ring",cat:"digital_arrest",x:60,y:370},
-    {id:"upi16",label:"cybercell@ybl",type:"upi",cat:"digital_arrest",x:180,y:370},
-    {id:"ph10",label:"+91-98765-00010",type:"phone",x:280,y:300},
-    {id:"upi10",label:"loanfast@ybl",type:"upi",cat:"job_scam",x:220,y:370},
-    {id:"upi15",label:"meta-jobs@ybl",type:"upi",cat:"job_scam",x:290,y:400},
-    {id:"upi19",label:"bgv-check@ybl",type:"upi",cat:"job_scam",x:340,y:370},
-  ],
-  edges: [
-    {from:"ph3",to:"upi4"},{from:"ph3",to:"upi7"},{from:"ph3",to:"upi13"},
-    {from:"ph1",to:"upi1"},{from:"ph1",to:"upi8"},
-    {from:"ph4",to:"upi5"},{from:"ph4",to:"upi16"},
-    {from:"ph10",to:"upi10"},{from:"ph10",to:"upi15"},{from:"ph10",to:"upi19"},
-  ]
-};
+    const categoryColors = {
+      fake_cashback: "#ef4444",
+      digital_arrest: "#a855f7",
+      kyc_freeze: "#f97316",
+      job_scam: "#3b82f6",
+      lottery_scam: "#22c55e",
+      govt_impersonation: "#92400e",
+      phishing_link: "#64748b",
+      legitimate: "#16a34a",
+    };
 
-const FEED_DATA = [
-  {city:"Mumbai",state:"Maharashtra",cat:"fake_cashback",upi:"cashback.official@okaxis",conf:0.97,minsAgo:1},
-  {city:"Delhi",state:"Delhi",cat:"digital_arrest",upi:"cbi.penalty@upi",conf:0.99,minsAgo:2},
-  {city:"Pune",state:"Maharashtra",cat:"phishing_link",upi:"N/A",conf:0.94,minsAgo:3},
-  {city:"Lucknow",state:"UP",cat:"lottery_scam",upi:"kbcprize2024@paytm",conf:0.96,minsAgo:5},
-  {city:"Chennai",state:"Tamil Nadu",cat:"govt_impersonation",upi:"echallane.pay@ybl",conf:0.91,minsAgo:7},
-  {city:"Kolkata",state:"West Bengal",cat:"kyc_freeze",upi:"sbikyc.update@ybl",conf:0.98,minsAgo:9},
-  {city:"Jaipur",state:"Rajasthan",cat:"job_scam",upi:"taskpay.earn@ybl",conf:0.93,minsAgo:11},
-  {city:"Hyderabad",state:"Telangana",cat:"fake_cashback",upi:"refund.process@paytm",conf:0.95,minsAgo:14},
-  {city:"Patna",state:"Bihar",cat:"digital_arrest",upi:"cybercell@ybl",conf:0.98,minsAgo:16},
-  {city:"Bengaluru",state:"Karnataka",cat:"phishing_link",upi:"N/A",conf:0.92,minsAgo:22},
-];
-
-const CAT_COLORS = {
-  fake_cashback:"#0a84ff", digital_arrest:"#ff2d55", kyc_freeze:"#5e5ce6",
-  job_scam:"#5e5ce6", lottery_scam:"#30d158", govt_impersonation:"#0a84ff",
-  phishing_link:"#ff2d55", legitimate:"#30d158",
-};
-
-const EXAMPLES = {
-  cashback: "Google Pay se aapko Rs.1500 cashback mila hai. Collect request approve karein: cashback@ybl",
-  arrest: "CBI officer here. Your Aadhaar linked to money laundering. Transfer Rs.50,000 or face arrest. Call immediately.",
-  kyc: "HDFC Bank Alert: Your KYC is expired. Account will be blocked in 24 hours. Update now at hdfc-kyc-verify.xyz",
-  job: "Work from home job! Earn Rs.15,000/day. No experience needed. Amazon hiring. WhatsApp now: +91 98765 00001",
-  legit: "Your OTP for SBI NetBanking login is 482910. Valid for 10 minutes. Do not share with anyone.",
-};
-
-// ── Map ──
-const map = L.map("map", {center:[22.5,82.5],zoom:5,zoomControl:true,minZoom:4,maxZoom:10});
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"OSM"}).addTo(map);
-const heatData = HOTSPOTS.map(h=>[h[0],h[1],h[2]]);
-const heatLayer = L.heatLayer(heatData,{radius:40,blur:30,maxZoom:10,gradient:{0.2:"#5e5ce6",0.5:"#0a84ff",0.8:"#ff2d55",1.0:"#ffffff"}});
-const markersLayer = L.layerGroup();
-HOTSPOTS.forEach(h=>{
-  const [lat,lng,intensity,city,state,count,cat]=h;
-  const color=CAT_COLORS[cat]||"#0a84ff";
-  const radius=5+intensity*12;
-  L.circleMarker([lat,lng],{radius,fillColor:color,color,weight:1,opacity:0.9,fillOpacity:0.6})
-    .bindTooltip(`<strong>${city}, ${state}</strong><br>${count} reports · ${cat.replace(/_/g," ")}`,{className:"scam-tooltip"})
-    .addTo(markersLayer);
-});
-heatLayer.addTo(map);
-let currentLayer="heat";
-function setLayer(mode){
-  document.querySelectorAll(".map-btn").forEach(b=>b.classList.remove("active"));
-  event.target.classList.add("active");
-  if(mode==="heat"){map.addLayer(heatLayer);map.removeLayer(markersLayer);}
-  else if(mode==="markers"){map.removeLayer(heatLayer);map.addLayer(markersLayer);}
-  else{map.addLayer(heatLayer);map.addLayer(markersLayer);}
-}
-
-// ── Feed ──
-function renderFeed(){
-  const container=document.getElementById("tab-feed");
-  container.innerHTML="";
-  FEED_DATA.forEach((item,i)=>{
-    const el=document.createElement("div");
-    el.className="feed-item";
-    el.style.animationDelay=`${i*0.05}s`;
-    el.innerHTML=`
-      <div class="feed-header">
-        <span class="feed-category cat-${item.cat}">${item.cat.replace(/_/g," ").toUpperCase()}</span>
-        <span class="feed-time">${item.minsAgo}m ago</span>
-      </div>
-      <div class="feed-location"><strong>${item.city}</strong>, ${item.state}</div>
-      <div class="feed-upi">${item.upi}</div>
-      <div class="feed-conf">
-        <div class="conf-bar"><div class="conf-fill" style="width:${item.conf*100}%"></div></div>
-        <div class="conf-pct">${Math.round(item.conf*100)}%</div>
-      </div>`;
-    container.appendChild(el);
-  });
-}
-
-// ── Network ──
-function drawNetwork(){
-  const canvas=document.getElementById("network-canvas");
-  const container=document.getElementById("tab-network");
-  canvas.width=container.offsetWidth||340;
-  canvas.height=container.offsetHeight-50||350;
-  const ctx=canvas.getContext("2d");
-  const scaleX=canvas.width/420;
-  const scaleY=canvas.height/460;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle="#0d1117";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  const nodeMap={};
-  SCAM_NETWORK.nodes.forEach(n=>{nodeMap[n.id]=n;});
-  SCAM_NETWORK.edges.forEach(e=>{
-    const a=nodeMap[e.from],b=nodeMap[e.to];
-    if(!a||!b)return;
-    const isRing=a.type==="phone"&&nodeMap[e.to]?.type==="ring";
-    ctx.beginPath();
-    ctx.moveTo(a.x*scaleX,a.y*scaleY);
-    ctx.lineTo(b.x*scaleX,b.y*scaleY);
-    ctx.strokeStyle=isRing?"rgba(94,92,230,0.7)":"rgba(255,45,85,0.35)";
-    ctx.lineWidth=isRing?2:1;
-    ctx.setLineDash(isRing?[]:[4,4]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  });
-  SCAM_NETWORK.nodes.forEach(n=>{
-    const x=n.x*scaleX,y=n.y*scaleY;
-    const color=n.type==="phone"?"#0a84ff":n.type==="ring"?"#5e5ce6":"#ff2d55";
-    const radius=n.type==="phone"?8:6;
-    const grd=ctx.createRadialGradient(x,y,0,x,y,radius*3);
-    grd.addColorStop(0,color+"44");
-    grd.addColorStop(1,"transparent");
-    ctx.fillStyle=grd;
-    ctx.beginPath();
-    ctx.arc(x,y,radius*3,0,Math.PI*2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(x,y,radius,0,Math.PI*2);
-    ctx.fillStyle=color;
-    ctx.fill();
-    ctx.strokeStyle="#0d1117";
-    ctx.lineWidth=2;
-    ctx.stroke();
-    ctx.fillStyle="#7d8590";
-    ctx.font=`${Math.round(9*Math.min(scaleX,scaleY)+2)}px 'Space Mono',monospace`;
-    ctx.textAlign="center";
-    ctx.fillText(n.label.split("@")[0],x,y+radius+12);
-  });
-}
-
-// ── Category stats ──
-function renderCategoryStats(){
-  const container=document.getElementById("tab-stats");
-  const cats=[
-    {name:"Fake Cashback",count:891,pct:31,cat:"fake_cashback"},
-    {name:"Govt Impersonation",count:634,pct:22,cat:"govt_impersonation"},
-    {name:"Phishing Link",count:521,pct:18,cat:"phishing_link"},
-    {name:"Digital Arrest",count:412,pct:14,cat:"digital_arrest"},
-    {name:"Job Scam",count:234,pct:8,cat:"job_scam"},
-    {name:"KYC Freeze",count:98,pct:3,cat:"kyc_freeze"},
-    {name:"Lottery Scam",count:57,pct:2,cat:"lottery_scam"},
-  ];
-  cats.forEach(c=>{
-    const color=CAT_COLORS[c.cat]||"#0a84ff";
-    const div=document.createElement("div");
-    div.style.cssText="padding:0 4px";
-    div.innerHTML=`
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px;">
-        <span>${c.name}</span>
-        <span style="font-family:'Space Mono',monospace;color:${color}">${c.count}</span>
-      </div>
-      <div style="background:var(--border);border-radius:var(--radius);height:6px;margin-bottom:12px;overflow:hidden;">
-        <div style="width:${c.pct}%;height:100%;background:${color};border-radius:var(--radius);"></div>
-      </div>`;
-    container.appendChild(div);
-  });
-}
-
-// ── Tab switching ──
-function switchTab(name,btn){
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  document.querySelectorAll(".tab-content").forEach(t=>t.classList.remove("active"));
-  btn.classList.add("active");
-  document.getElementById("tab-"+name).classList.add("active");
-  if(name==="network")setTimeout(drawNetwork,50);
-}
-
-// ── Counters ──
-function animateCounter(el,target,duration=2000){
-  let start=0;
-  const step=target/(duration/16);
-  const timer=setInterval(()=>{
-    start=Math.min(start+step,target);
-    el.textContent=Math.floor(start).toLocaleString("en-IN");
-    if(start>=target)clearInterval(timer);
-  },16);
-}
-
-// ── Live feed simulation ──
-let feedIndex=0;
-function addLiveFeedItem(){
-  const templates=[
-    {city:"Surat",state:"Gujarat",cat:"fake_cashback",upi:"cashback@ybl",conf:0.96},
-    {city:"Kanpur",state:"UP",cat:"digital_arrest",upi:"cbi.officer@upi",conf:0.99},
-    {city:"Nagpur",state:"Maharashtra",cat:"phishing_link",upi:"N/A",conf:0.93},
-    {city:"Indore",state:"MP",cat:"govt_impersonation",upi:"rto-challan@ybl",conf:0.91},
-    {city:"Bhopal",state:"MP",cat:"job_scam",upi:"workfromhome@ybl",conf:0.94},
-  ];
-  const item={...templates[feedIndex%templates.length],minsAgo:0};
-  feedIndex++;
-  const container=document.getElementById("tab-feed");
-  const el=document.createElement("div");
-  el.className="feed-item";
-  el.style.borderLeft=`3px solid ${CAT_COLORS[item.cat]}`;
-  el.innerHTML=`
-    <div class="feed-header">
-      <span class="feed-category cat-${item.cat}">${item.cat.replace(/_/g," ").toUpperCase()}</span>
-      <span class="feed-time">just now</span>
-    </div>
-    <div class="feed-location"><strong>${item.city}</strong>, ${item.state}</div>
-    <div class="feed-upi">${item.upi}</div>
-    <div class="feed-conf">
-      <div class="conf-bar"><div class="conf-fill" style="width:${item.conf*100}%"></div></div>
-      <div class="conf-pct">${Math.round(item.conf*100)}%</div>
-    </div>`;
-  container.insertBefore(el,container.firstChild);
-  const counter=document.getElementById("total-counter");
-  counter.textContent=(parseInt(counter.textContent.replace(/,/g,""))+1).toLocaleString("en-IN");
-  while(container.children.length>20)container.removeChild(container.lastChild);
-}
-
-// ── LIVE TESTER ──
-const API_URL = "https://fraudshield-api.azurewebsites.net/api/classify";
-
-function fillExample(type){
-  document.getElementById("tester-input").value = EXAMPLES[type];
-  document.getElementById("tester-result").classList.remove("visible");
-}
-
-async function analyzeMessage(){
-  const input = document.getElementById("tester-input");
-  const btn = document.getElementById("tester-btn");
-  const loading = document.getElementById("tester-loading");
-  const resultDiv = document.getElementById("tester-result");
-  const message = input.value.trim();
-
-  if(!message){ input.focus(); return; }
-
-  btn.disabled = true;
-  loading.classList.add("visible");
-  resultDiv.classList.remove("visible");
-
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({message, source:"dashboard", sender:"dashboard_user"})
-    });
-    const data = await res.json();
-
-    const isScam = data.is_scam;
-    const cat = data.category || "unknown";
-    const conf = Math.round((data.confidence||0)*100);
-    const hindi = data.explanation_hindi || "";
-    const flags = data.red_flags || [];
-    const color = CAT_COLORS[cat] || "#0a84ff";
-
-    resultDiv.innerHTML = `
-      <div class="result-verdict" style="color:${isScam?'var(--accent2)':'var(--green)'}">
-        ${isScam ? "🚨 SCAM DETECTED" : "✅ LEGITIMATE MESSAGE"}
-        <span style="font-size:13px;font-family:'Space Mono',monospace;color:var(--muted);font-weight:400;">
-          via Azure OpenAI o4-mini
-        </span>
-      </div>
-      <div class="result-grid">
-        <div class="result-field">
-          <div class="result-label">Category</div>
-          <div class="result-value">
-            <span class="feed-category cat-${cat}" style="font-size:12px;">
-              ${cat.replace(/_/g," ").toUpperCase()}
-            </span>
-          </div>
-        </div>
-        <div class="result-field">
-          <div class="result-label">Confidence</div>
-          <div class="result-value" style="color:${color}">${conf}%</div>
-        </div>
-        <div class="result-field">
-          <div class="result-label">Risk Level</div>
-          <div class="result-value" style="color:${conf>90?'var(--accent2)':conf>70?'var(--accent)':'var(--green)'}">
-            ${conf>90?"CRITICAL":conf>70?"HIGH":conf>50?"MEDIUM":"LOW"}
-          </div>
-        </div>
-      </div>
-      ${hindi ? `<div class="result-hindi">🗣️ ${hindi}</div>` : ""}
-      ${flags.length ? `
-        <div class="result-label" style="margin-bottom:6px;">Red Flags</div>
-        <div class="result-flags">
-          ${flags.map(f=>`<span class="result-flag">⚠ ${f}</span>`).join("")}
-        </div>` : ""}
-      ${isScam ? `
-        <div class="result-report">
-          📞 Report this scam: Call <strong>1930</strong> | Visit <strong>cybercrime.gov.in</strong>
-        </div>` : ""}
-    `;
-
-    resultDiv.classList.add("visible");
-
-    // Drop pin on map for this test
-    dropTestPinOnMap(cat);
-
-    // Add to live feed
-    const feedContainer = document.getElementById("tab-feed");
-    const el = document.createElement("div");
-    el.className = "feed-item";
-    el.style.borderLeft = `3px solid ${isScam ? color : 'var(--green)'}`;
-    el.innerHTML = `
-      <div class="feed-header">
-        <span class="feed-category cat-${cat}">${cat.replace(/_/g," ").toUpperCase()}</span>
-        <span class="feed-time">just now</span>
-      </div>
-      <div class="feed-location"><strong>Dashboard Test</strong></div>
-      <div class="feed-upi">${message.substring(0,50)}${message.length>50?"...":""}</div>
-      <div class="feed-conf">
-        <div class="conf-bar"><div class="conf-fill" style="width:${conf}%"></div></div>
-        <div class="conf-pct">${conf}%</div>
-      </div>`;
-    feedContainer.insertBefore(el, feedContainer.firstChild);
-
-  } catch(err) {
-    resultDiv.innerHTML = `
-      <div style="color:var(--accent2);font-family:'Space Mono',monospace;font-size:12px;">
-        ⚠ API Error: ${err.message}<br>
-        <span style="color:var(--muted);">Make sure the Azure Function is running and CORS is enabled.</span>
-      </div>`;
-    resultDiv.classList.add("visible");
-  } finally {
-    btn.disabled = false;
-    loading.classList.remove("visible");
-  }
-}
-
-// Allow Enter key (Ctrl+Enter) to submit
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("tester-input").addEventListener("keydown", e => {
-    if(e.key === "Enter" && e.ctrlKey) analyzeMessage();
-  });
-});
-
-// ── API Health Check ──
-const HEALTH_URL = "https://fraudshield-api.azurewebsites.net/api/health";
-
-async function checkApiHealth() {
-  const statusEl = document.getElementById("api-status");
-  const textEl = document.getElementById("api-status-text");
-  try {
-    const res = await fetch(HEALTH_URL, {signal: AbortSignal.timeout(5000)});
-    if (res.ok) {
-      statusEl.className = "api-status online";
-      textEl.textContent = "API ONLINE";
-    } else {
-      throw new Error("non-ok");
+    function formatCategoryLabel(key) {
+      return key
+        .split("_")
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
     }
-  } catch {
-    statusEl.className = "api-status offline";
-    textEl.textContent = "API OFFLINE";
-  }
-}
 
-// ── Live counter tick (goes up every few seconds) ──
-function startLiveCounterTick() {
-  setInterval(() => {
-    const el = document.getElementById("total-counter");
-    const current = parseInt(el.textContent.replace(/,/g, "")) || 0;
-    el.textContent = (current + Math.floor(Math.random() * 3 + 1)).toLocaleString("en-IN");
-  }, 4500);
-  setInterval(() => {
-    const el = document.getElementById("blocked-counter");
-    const current = parseInt(el.textContent.replace(/,/g, "")) || 0;
-    el.textContent = (current + Math.floor(Math.random() * 3 + 1)).toLocaleString("en-IN");
-  }, 5200);
-  // Also tick stat-total
-  setInterval(() => {
-    const el = document.getElementById("stat-total");
-    const current = parseInt(el.textContent.replace(/,/g, "")) || 0;
-    el.textContent = (current + 1).toLocaleString("en-IN");
-  }, 6000);
-}
+    // HERO – API integration
+    (function setupHero() {
+      const textarea = document.getElementById("messageInput");
+      const analyzeButton = document.getElementById("analyzeButton");
+      const resultCard = document.getElementById("resultCard");
+      const resultTitle = document.getElementById("resultTitle");
+      const categoryBadge = document.getElementById("categoryBadge");
+      const categoryLabel = document.getElementById("categoryLabel");
+      const riskBadge = document.getElementById("riskBadge");
+      const riskLabel = document.getElementById("riskLabel");
+      const confidenceBadge = document.getElementById("confidenceBadge");
+      const confidenceLabel = document.getElementById("confidenceLabel");
+      const resultExplanation = document.getElementById("resultExplanation");
+      const redFlagsRow = document.getElementById("redFlagsRow");
+      const resultError = document.getElementById("resultError");
 
-// ── Drop test pin on map ──
-let testPinLayer = null;
-const INDIA_CITIES_LATLNG = [
-  [28.6139,77.2090],[19.0760,72.8777],[12.9716,77.5946],[22.5726,88.3639],
-  [17.3850,78.4867],[13.0827,80.2707],[23.0225,72.5714],[26.8467,80.9462],
-  [18.5204,73.8567],[26.9124,75.7873],[25.5941,85.1376],[21.1458,79.0882],
-];
+      // Example chips
+      document.getElementById("exampleChips").addEventListener("click", (e) => {
+        const target = e.target.closest(".chip");
+        if (!target) return;
+        const text = target.getAttribute("data-example");
+        if (text) {
+          textarea.value = text;
+          textarea.focus();
+        }
+      });
 
-function dropTestPinOnMap(category) {
-  if (testPinLayer) { map.removeLayer(testPinLayer); }
-  const city = INDIA_CITIES_LATLNG[Math.floor(Math.random() * INDIA_CITIES_LATLNG.length)];
-  const color = CAT_COLORS[category] || "#0a84ff";
+      function resetResult() {
+        resultCard.classList.remove("scam", "safe", "show");
+        resultExplanation.textContent = "";
+        redFlagsRow.innerHTML = "";
+        resultError.style.display = "none";
+        resultError.textContent = "";
+        categoryBadge.style.display = "none";
+        riskBadge.style.display = "none";
+        confidenceBadge.style.display = "none";
+      }
 
-  // Pulsing circle
-  testPinLayer = L.layerGroup();
-  const pulse = L.circleMarker(city, {
-    radius: 18, fillColor: color, color: color,
-    weight: 2, opacity: 0.6, fillOpacity: 0.15,
-    className: "test-pin-pulse"
-  });
-  const dot = L.circleMarker(city, {
-    radius: 7, fillColor: color, color: "#fff",
-    weight: 2, opacity: 1, fillOpacity: 1,
-  }).bindTooltip(`🔍 LIVE TEST · ${category.replace(/_/g," ").toUpperCase()}`,
-    {className:"scam-tooltip", permanent: true, direction: "top"});
+      function applyResult(data) {
+        // Heuristic interpretation of API response
+        const categoryKey = data.category || data.top_category || "legitimate";
+        const risk = (data.risk_level || data.risk || (categoryKey === "legitimate" ? "LOW" : "HIGH")).toUpperCase();
+        const confidence = typeof data.confidence === "number"
+          ? data.confidence
+          : (typeof data.score === "number" ? data.score : null);
+        const isLegit = categoryKey === "legitimate" || risk === "LOW";
+        const explanation = data.explanation_hi || data.explanation || data.reason_hi || "";
+        const redFlags = Array.isArray(data.red_flags) ? data.red_flags : (Array.isArray(data.flags) ? data.flags : []);
 
-  testPinLayer.addLayer(pulse);
-  testPinLayer.addLayer(dot);
-  testPinLayer.addTo(map);
-  map.flyTo(city, 6, {duration: 1.2});
+        resultCard.classList.remove("scam", "safe");
+        resultCard.classList.add(isLegit ? "safe" : "scam");
+        resultTitle.textContent = isLegit ? "SAFE MESSAGE" : "SCAM DETECTED";
 
-  // Remove after 12 seconds
-  setTimeout(() => {
-    if (testPinLayer) { map.removeLayer(testPinLayer); testPinLayer = null; }
-  }, 12000);
-}
+        // Category
+        const catColor = categoryColors[categoryKey] || "#e5e7eb";
+        categoryBadge.style.display = "inline-flex";
+        categoryBadge.querySelector(".badge-dot").style.backgroundColor = catColor;
+        categoryBadge.style.borderColor = catColor + "cc";
+        categoryLabel.textContent = formatCategoryLabel(categoryKey);
 
-// ── Scam of the Day rotation ──
-const SOTD_DATA = [
-  { title: "Digital Arrest Scam — Most Dangerous Today", msg: '"CBI officer here. Your Aadhaar linked to money laundering. Transfer Rs.50,000 immediately."', count: 634, cat: "digital_arrest" },
-  { title: "Fake Cashback — Most Frequent Today", msg: '"Google Pay se aapko Rs.2000 cashback mila hai. Approve karein: cashback@ybl"', count: 891, cat: "fake_cashback" },
-  { title: "KYC Freeze — Rapidly Rising", msg: '"HDFC Bank: Your KYC expired. Account will be blocked in 24 hours. Update at hdfc-kyc.xyz"', count: 421, cat: "kyc_freeze" },
-  { title: "Phishing Link — New Wave Detected", msg: '"E-Challan: Your vehicle has a pending fine of Rs.1,200. Pay now: echallan-pay.xyz"', count: 312, cat: "phishing_link" },
-];
-let sotdIndex = 0;
-function rotateSotd() {
-  const d = SOTD_DATA[sotdIndex % SOTD_DATA.length];
-  sotdIndex++;
-  const titleEl = document.getElementById("sotd-title");
-  const msgEl = document.getElementById("sotd-msg");
-  const countEl = document.getElementById("sotd-count");
-  titleEl.style.opacity = 0;
-  msgEl.style.opacity = 0;
-  setTimeout(() => {
-    titleEl.textContent = d.title;
-    msgEl.textContent = d.msg;
-    countEl.textContent = d.count.toLocaleString("en-IN");
-    titleEl.style.transition = "opacity 0.6s";
-    msgEl.style.transition = "opacity 0.6s";
-    titleEl.style.opacity = 1;
-    msgEl.style.opacity = 1;
-  }, 300);
-}
+        // Risk
+        riskBadge.style.display = "inline-flex";
+        riskLabel.textContent = risk;
 
-// ── Init ──
-window.addEventListener("load",()=>{
-  renderFeed();
-  renderCategoryStats();
-  drawNetwork();
-  animateCounter(document.getElementById("total-counter"),2847);
-  animateCounter(document.getElementById("blocked-counter"),2736);
-  animateCounter(document.getElementById("stat-total"),2847);
-  animateCounter(document.getElementById("stat-arrest"),634);
-  animateCounter(document.getElementById("stat-cashback"),891);
-  animateCounter(document.getElementById("stat-kyc"),421);
-  setInterval(addLiveFeedItem,8000);
+        // Confidence
+        if (confidence !== null && !Number.isNaN(confidence)) {
+          const pct = Math.round(confidence * 100);
+          confidenceBadge.style.display = "inline-flex";
+          confidenceLabel.textContent = pct + "% confidence";
+        } else {
+          confidenceBadge.style.display = "none";
+        }
 
-  // New features
-  checkApiHealth();
-  setInterval(checkApiHealth, 30000);
-  setTimeout(startLiveCounterTick, 2200);
-  setInterval(rotateSotd, 12000);
-});
+        // Explanation
+        if (explanation) {
+          resultExplanation.textContent = explanation;
+        } else {
+          resultExplanation.textContent = isLegit
+            ? "कोई स्पष्ट धोखाधड़ी पैटर्न नहीं मिला। फिर भी, कभी भी OTP, PIN या पूरा कार्ड नंबर साझा न करें।"
+            : "संदेश में उच्च जोखिम वाले पैटर्न मिले। किसी भी लिंक पर क्लिक न करें, पैसे न भेजें और 1930 पर रिपोर्ट करें।";
+        }
 
-window.addEventListener("resize",drawNetwork);
-</script>
+        // Red flags
+        redFlagsRow.innerHTML = "";
+        if (redFlags.length) {
+          redFlags.forEach(flag => {
+            const el = document.createElement("div");
+            el.className = "pill";
+            el.textContent = flag;
+            redFlagsRow.appendChild(el);
+          });
+        } else {
+          const el = document.createElement("div");
+          el.className = "pill";
+          el.textContent = isLegit ? "No critical fraud triggers" : "Urgency · unknown number · money demand";
+          redFlagsRow.appendChild(el);
+        }
+
+        resultCard.classList.add("show");
+      }
+
+      async function analyze() {
+        const message = textarea.value.trim();
+        if (!message) {
+          textarea.focus();
+          return;
+        }
+
+        resetResult();
+        analyzeButton.disabled = true;
+        analyzeButton.textContent = "ANALYZING...";
+
+        try {
+          const res = await fetch("https://fraudshield-api.azurewebsites.net/api/classify", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              message,
+              source: "landing",
+            }),
+          });
+
+          if (!res.ok) {
+            throw new Error("API error: " + res.status);
+          }
+
+          const data = await res.json();
+          applyResult(data);
+        } catch (err) {
+          resultCard.classList.add("show", "scam");
+          resultTitle.textContent = "UNABLE TO REACH CLASSIFIER";
+          resultExplanation.textContent = "API कॉल फिलहाल उपलब्ध नहीं है। कुछ देर बाद दोबारा कोशिश करें, या सीधे cybercrime.gov.in पर रिपोर्ट दर्ज करें।";
+          categoryBadge.style.display = "none";
+          riskBadge.style.display = "none";
+          confidenceBadge.style.display = "none";
+          resultError.style.display = "block";
+          resultError.textContent = String(err);
+        } finally {
+          analyzeButton.disabled = false;
+          analyzeButton.textContent = "ANALYZE";
+        }
+      }
+
+      analyzeButton.addEventListener("click", analyze);
+      textarea.addEventListener("keydown", (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+          e.preventDefault();
+          analyze();
+        }
+      });
+    })();
+
+    // Scroll hint
+    (function setupScrollHint() {
+      const scrollHint = document.getElementById("scrollHint");
+      scrollHint.addEventListener("click", () => {
+        const target = document.getElementById("map-section");
+        if (target) target.scrollIntoView({ behavior: "smooth" });
+      });
+    })();
+
+    // Leaflet map + heatmap
+    (function setupMap() {
+      const map = L.map("map", {
+        zoomControl: false,
+        attributionControl: false,
+      }).setView([20.5937, 78.9629], 5);
+
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 18,
+      }).addTo(map);
+
+      const maxReports = scamReports.reduce((max, r) => Math.max(max, r.reports), 0);
+
+      function radiusForReports(reports) {
+        const minR = 8;
+        const maxR = 28;
+        const ratio = reports / maxReports;
+        return minR + (maxR - minR) * ratio;
+      }
+
+      function colorForReports(reports) {
+        if (reports > 500) return "#ef4444";  // Red = Critical
+        if (reports >= 200) return "#f97316"; // Orange = High
+        return "#22c55e";                    // Green = Moderate
+      }
+
+      const heatPoints = [];
+
+      scamReports.forEach((r) => {
+        const color = colorForReports(r.reports);
+        const radius = radiusForReports(r.reports);
+
+        L.circleMarker([r.lat, r.lng], {
+          radius,
+          color: color,
+          weight: 1.5,
+          fillColor: color,
+          fillOpacity: 0.35,
+        }).addTo(map).bindPopup(`
+          <div style="font-family:'IBM Plex Sans', system-ui, sans-serif; font-size:12px; color:#e5e5e5;">
+            <div style="font-weight:600; margin-bottom:2px;">${r.city}</div>
+            <div style="color:#9ca3af; margin-bottom:4px;">Reports: <strong>${r.reports}</strong></div>
+            <div style="margin-bottom:4px;">
+              Top scam:
+              <span style="
+                display:inline-flex;
+                align-items:center;
+                gap:4px;
+                padding:2px 7px;
+                border-radius:999px;
+                border:1px solid ${categoryColors[r.topScam] || "#e5e5e5"};
+                font-size:11px;
+              ">
+                <span style="width:8px;height:8px;border-radius:999px;background:${categoryColors[r.topScam] || "#e5e5e5"};"></span>
+                <span>${formatCategoryLabel(r.topScam)}</span>
+              </span>
+            </div>
+            <div style="font-size:11px; color:#9ca3af;">Report: cybercrime.gov.in | 1930</div>
+          </div>
+        `);
+
+        heatPoints.push([r.lat, r.lng, Math.max(0.3, r.reports / maxReports)]);
+      });
+
+      L.heatLayer(heatPoints, {
+        radius: 35,
+        blur: 25,
+        maxZoom: 12,
+      }).addTo(map);
+
+      // Legend overlay
+      const legend = document.createElement("div");
+      legend.className = "map-legend";
+      legend.innerHTML = `
+        <span style="margin-right:2px;">Legend:</span>
+        <span class="legend-item">
+          <span class="legend-dot" style="background:#ef4444;"></span>
+          <span>Critical</span>
+        </span>
+        <span class="legend-item">
+          <span class="legend-dot" style="background:#f97316;"></span>
+          <span>High</span>
+        </span>
+        <span class="legend-item">
+          <span class="legend-dot" style="background:#22c55e;"></span>
+          <span>Moderate</span>
+        </span>
+      `;
+      document.getElementById("map").appendChild(legend);
+    })();
+
+    // Stats: counter + chart
+    (function setupStats() {
+      const totalReports = scamReports.reduce((sum, r) => sum + r.reports, 0);
+      const counterEl = document.getElementById("reportsCounter");
+
+      let start = null;
+      const duration = 1200;
+
+      function animateCounter(timestamp) {
+        if (!start) start = timestamp;
+        const progress = Math.min((timestamp - start) / duration, 1);
+        const current = Math.floor(totalReports * (0.2 + 0.8 * progress));
+        counterEl.textContent = current.toLocaleString("en-IN");
+        if (progress < 1) {
+          window.requestAnimationFrame(animateCounter);
+        }
+      }
+      window.requestAnimationFrame(animateCounter);
+
+      // Category breakdown
+      const categoryCounts = {
+        fake_cashback: 0,
+        digital_arrest: 0,
+        kyc_freeze: 0,
+        job_scam: 0,
+        lottery_scam: 0,
+        govt_impersonation: 0,
+        phishing_link: 0,
+        legitimate: 0,
+      };
+
+      scamReports.forEach((r) => {
+        if (categoryCounts.hasOwnProperty(r.topScam)) {
+          categoryCounts[r.topScam] += r.reports;
+        }
+      });
+
+      // Allocate a small slice to "legitimate" so chart has all 8
+      categoryCounts.legitimate = Math.round(totalReports * 0.12);
+
+      const labels = Object.keys(categoryCounts);
+      const values = labels.map((k) => categoryCounts[k]);
+      const colors = labels.map((k) => categoryColors[k]);
+
+      const ctx = document.getElementById("categoryChart").getContext("2d");
+      new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: labels.map(formatCategoryLabel),
+          datasets: [
+            {
+              data: values,
+              backgroundColor: colors,
+              borderWidth: 0,
+            },
+          ],
+        },
+        options: {
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const label = ctx.label || "";
+                  const value = ctx.raw || 0;
+                  const pct = ((value / values.reduce((a, b) => a + b, 0)) * 100).toFixed(1);
+                  return `${label}: ${value.toLocaleString("en-IN")} (${pct}%)`;
+                },
+              },
+            },
+          },
+          cutout: "62%",
+          responsive: true,
+          maintainAspectRatio: false,
+        },
+      });
+
+      // Custom legend
+      const legendEl = document.getElementById("chartLegend");
+      labels.forEach((key) => {
+        const row = document.createElement("div");
+        row.className = "chart-legend-item";
+        const swatch = document.createElement("div");
+        swatch.className = "chart-legend-swatch";
+        swatch.style.backgroundColor = categoryColors[key];
+        const labelSpan = document.createElement("span");
+        labelSpan.textContent = formatCategoryLabel(key);
+        row.appendChild(swatch);
+        row.appendChild(labelSpan);
+        legendEl.appendChild(row);
+      });
+    })();
+
+    // Scam evolution bar animations
+    (function setupEvolutionBars() {
+      const fills = document.querySelectorAll(".bar-fill");
+      fills.forEach((fill) => {
+        const score = parseFloat(fill.getAttribute("data-score") || "0");
+        const pct = Math.max(0, Math.min(1, score)) * 100;
+        requestAnimationFrame(() => {
+          fill.style.width = pct + "%";
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
+
