@@ -59,7 +59,7 @@ class Handler(BaseHTTPRequestHandler):
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": f"Analyze: {message}"}
                     ],
-                    temperature=0.1, max_tokens=500
+                    temperature=0.1, max_completion_tokens=500
                 )
                 text = response.choices[0].message.content
                 text = text.replace("```json", "").replace("```", "").strip()
