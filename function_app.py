@@ -12,7 +12,7 @@ from gremlin_python.driver import client as gremlin_driver, serializer
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 # ── Azure OpenAI client ───────────────────────────────────────────────────────
-MODEL = "o4-mini"
+MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT", "o4-mini")   # FIX 1: use env var
 _client: AzureOpenAI | None = None
 
 def _get_client() -> AzureOpenAI:
@@ -28,7 +28,7 @@ def _get_client() -> AzureOpenAI:
         _client = AzureOpenAI(
             azure_endpoint=endpoint,
             api_key=key,
-            api_version="2024-12-01-preview",
+            api_version="2025-04-01-preview",              # FIX 2: correct api_version for o4-mini
         )
     return _client
 
@@ -247,8 +247,10 @@ def classify_message(message: str, source: str = "unknown", sender: str = "unkno
     response = _get_client().chat.completions.create(
         model=MODEL,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": user_content},
+            {
+                "role": "user",                            # FIX 3: o4-mini doesn't support system role
+                "content": SYSTEM_PROMPT + "\n\n" + user_content,
+            },
         ],
         max_completion_tokens=512,
     )
@@ -432,8 +434,8 @@ def telegram_webhook(req: func.HttpRequest) -> func.HttpResponse:
     import requests as req_lib
     import threading
 
-    BOT_TOKEN  = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    API_URL    = "https://fraudshield-api.azurewebsites.net/api/classify"
+    BOT_TOKEN    = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    API_URL      = os.environ.get("FUNCTION_APP_URL", "https://fraudshield-api.azurewebsites.net/api/classify")  # FIX 4: use env var
     TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
     def send(chat_id, text):
