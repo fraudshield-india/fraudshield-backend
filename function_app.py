@@ -1,22 +1,16 @@
+import azure.functions as func
 import json
 import logging
 import os
-
-import azure.functions as func
 from openai import OpenAI
-
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
-
-# ── GitHub Models client (o4-mini) ────────────────────────────────────────────
-MODEL = "o4-mini"
-
 client = OpenAI(
     base_url="https://models.inference.ai.azure.com",
-    api_key=os.environ.get("GITHUB_TOKEN"),
+    api_key=os.environ["GITHUB_TOKEN"],
 )
-
+MODEL = "o4-mini"
 
 SYSTEM_PROMPT = """You are FraudShield India, an expert UPI fraud detection system.
 Analyze messages for fraud patterns common in India. Classify into one of:
@@ -38,43 +32,18 @@ Respond ONLY with valid JSON in this exact schema:
 }"""
 
 
-def classify_message(message: str, source: str = "unknown", sender: str = "unknown") -> dict:
-    """
-    Call GitHub Models (o4-mini) via OpenAI client to classify a UPI fraud message.
-    System prompt is merged into the user content because o4-mini does not support
-    the system role.
-    """
-    if not client.api_key:
-        raise RuntimeError("GITHUB_TOKEN is not configured in environment variables")
-
-    user_content = (
-        SYSTEM_PROMPT
-        + "\n\n"
-        + f"Source: {source}\nSender: {sender}\nMessage: {message}"
-    )
-
+def classify_message(message, source="unknown", sender="unknown"):
+    user_content = SYSTEM_PROMPT + f"\n\nSource: {source}\nSender: {sender}\nMessage: {message}"
     response = client.chat.completions.create(
         model=MODEL,
-        messages=[
-            {
-                "role": "user",
-                "content": user_content,
-            }
-        ],
-        # o4-mini uses max_completion_tokens instead of max_tokens
+        messages=[{"role": "user", "content": user_content}],
         max_completion_tokens=512,
     )
-
     raw = response.choices[0].message.content.strip()
-
-    # Strip accidental markdown fences if the model adds them
     if raw.startswith("```"):
-        parts = raw.split("```")
-        if len(parts) >= 2:
-            raw = parts[1]
-        if raw.lstrip().startswith("json"):
-            raw = raw.lstrip()[4:]
-
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
     result = json.loads(raw.strip())
     result["message"] = message
     result["source"] = source
@@ -82,7 +51,6 @@ def classify_message(message: str, source: str = "unknown", sender: str = "unkno
     return result
 
 
-# ── /api/classify ─────────────────────────────────────────────────────────────
 @app.route(route="classify", methods=["POST", "OPTIONS"])
 def classify(req: func.HttpRequest) -> func.HttpResponse:
     cors_headers = {
@@ -91,135 +59,47 @@ def classify(req: func.HttpRequest) -> func.HttpResponse:
         "Access-Control-Allow-Headers": "Content-Type",
         "Content-Type": "application/json",
     }
-
     if req.method == "OPTIONS":
         return func.HttpResponse(status_code=204, headers=cors_headers)
-
     try:
         body = req.get_json()
     except ValueError:
-        return func.HttpResponse(
-            json.dumps({"error": "Invalid JSON body"}),
-            status_code=400,
-            headers=cors_headers,
-        )
-
-    message = (body.get("message") or body.get("text") or "").strip()
+        return func.HttpResponse(json.dumps({"error": "Invalid JSON"}), status_code=400, headers=cors_headers)
+    message = body.get("message", "").strip()
     if not message:
-        return func.HttpResponse(
-            json.dumps({"error": "Field 'message' is required"}),
-            status_code=400,
-            headers=cors_headers,
-        )
-
-    source = body.get("source", "unknown")
-    sender = body.get("sender", "unknown")
-
+        return func.HttpResponse(json.dumps({"error": "'message' required"}), status_code=400, headers=cors_headers)
     try:
-        result = classify_message(message, source, sender)
-        logging.info(
-            "Classified [%s] → %s (%.2f)",
-            source,
-            result.get("category"),
-            result.get("confidence", 0.0),
-        )
-        return func.HttpResponse(
-            json.dumps(result, ensure_ascii=False),
-            status_code=200,
-            headers=cors_headers,
-        )
-    except Exception as exc:
-        logging.exception("Classification error: %s", exc)
-        return func.HttpResponse(
-            json.dumps(
-                {
-                    "error": "Classification failed",
-                    "detail": str(exc),
-                }
-            ),
-            status_code=500,
-            headers=cors_headers,
-        )
+        result = classify_message(message, body.get("source", "unknown"), body.get("sender", "unknown"))
+        return func.HttpResponse(json.dumps(result, ensure_ascii=False), status_code=200, headers=cors_headers)
+    except Exception as e:
+        logging.exception(e)
+        return func.HttpResponse(json.dumps({"error": str(e)}), status_code=500, headers=cors_headers)
 
 
-# ── /api/health ───────────────────────────────────────────────────────────────
 @app.route(route="health", methods=["GET"])
 def health(req: func.HttpRequest) -> func.HttpResponse:
-    body = {
-        "status": "ok",
-        "service": "FraudShield India",
-        "model": MODEL,
-    }
     return func.HttpResponse(
-        json.dumps(body),
+        json.dumps({"status": "ok", "service": "FraudShield India", "model": MODEL}),
         status_code=200,
-        headers={
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-        },
+        headers={"Content-Type": "application/json"},
     )
 
 
-# ── /api/batch ────────────────────────────────────────────────────────────────
-@app.route(route="batch", methods=["POST", "OPTIONS"])
+@app.route(route="batch", methods=["POST"])
 def batch_classify(req: func.HttpRequest) -> func.HttpResponse:
-    cors_headers = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Content-Type": "application/json",
-    }
-
-    if req.method == "OPTIONS":
-        return func.HttpResponse(status_code=204, headers=cors_headers)
-
+    cors_headers = {"Access-Control-Allow-Origin": "*", "Content-Type": "application/json"}
     try:
         body = req.get_json()
-    except ValueError:
-        return func.HttpResponse(
-            json.dumps({"error": "Invalid JSON body"}),
-            status_code=400,
-            headers=cors_headers,
-        )
+        messages = body.get("messages", [])
+        if not messages or len(messages) > 20:
+            return func.HttpResponse(json.dumps({"error": "Provide 1-20 messages"}), status_code=400, headers=cors_headers)
+        results = [classify_message(m.get("message", ""), m.get("source", "batch"), m.get("sender", "unknown")) for m in messages]
+        return func.HttpResponse(json.dumps({"results": results, "count": len(results)}, ensure_ascii=False), status_code=200, headers=cors_headers)
+    except Exception as e:
+        return func.HttpResponse(json.dumps({"error": str(e)}), status_code=500, headers=cors_headers)
+```
 
-    messages = body.get("messages", [])
-    if not isinstance(messages, list) or not messages:
-        return func.HttpResponse(
-            json.dumps({"error": "Provide 1–20 messages as a list in 'messages'."}),
-            status_code=400,
-            headers=cors_headers,
-        )
-    if len(messages) > 20:
-        return func.HttpResponse(
-            json.dumps({"error": "Batch size limit is 20 messages."}),
-            status_code=400,
-            headers=cors_headers,
-        )
-
-    results = []
-    for item in messages:
-        if isinstance(item, str):
-            msg_text = item
-            source = "batch"
-            sender = "unknown"
-        else:
-            msg_text = (item.get("message") or item.get("text") or "").strip()
-            source = item.get("source", "batch")
-            sender = item.get("sender", "unknown")
-
-        if not msg_text:
-            results.append({"error": "Empty message in batch item."})
-            continue
-
-        try:
-            r = classify_message(msg_text, source, sender)
-            results.append(r)
-        except Exception as e:
-            logging.exception("Batch classification error: %s", e)
-            results.append({"error": str(e), "message": msg_text})
-
-    return func.HttpResponse(
-        json.dumps({"results": results, "count": len(results)}, ensure_ascii=False),
-        status_code=200,
-        headers=cors_headers,
-    )
+Also update `requirements.txt` to exactly:
+```
+azure-functions==1.21.3
+openai==1.30.5
