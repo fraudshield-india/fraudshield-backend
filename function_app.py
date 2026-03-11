@@ -6,12 +6,19 @@ from openai import AzureOpenAI
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
-client = AzureOpenAI(
-    api_key=os.environ["AZURE_OPENAI_KEY"],
-    api_version="2024-12-01-preview",
-    azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-)
-MODEL = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "o4-mini")  # Deployment name in Azure AI Foundry
+_client = None
+MODEL = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "o4-mini")
+
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = AzureOpenAI(
+            api_key=os.environ["AZURE_OPENAI_KEY"],
+            api_version="2024-12-01-preview",
+            azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
+        )
+    return _client
 
 SYSTEM_PROMPT = """You are FraudShield India, an expert UPI fraud detection system.
 Analyze messages for fraud patterns common in India. Classify into one of:
@@ -36,7 +43,7 @@ Respond ONLY with valid JSON (no markdown, no backticks):
 
 
 def classify_message(message, source="unknown", sender="unknown"):
-    response = client.chat.completions.create(
+    response = _get_client().chat.completions.create(
         model=MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
