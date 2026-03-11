@@ -1,12 +1,13 @@
 import os
 import json
-from openai import OpenAI
+from openai import AzureOpenAI
 from dotenv import load_dotenv
 load_dotenv()
 
-client = OpenAI(
-    base_url=os.getenv("OPENAI_BASE_URL", "https://models.inference.ai.azure.com"),
-    api_key=os.getenv("GITHUB_TOKEN")
+client = AzureOpenAI(
+    api_key=os.environ["AZURE_OPENAI_KEY"],
+    api_version="2024-12-01-preview",
+    azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
 )
 
 SYSTEM_PROMPT = '''You are FraudShield, a UPI fraud detection system for India.
@@ -35,12 +36,10 @@ Respond ONLY with valid JSON (no markdown, no backticks):
 
 def classify_message(message, language="auto"):
     response = client.chat.completions.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model=os.environ.get("AZURE_OPENAI_DEPLOYMENT", "o4-mini"),
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Analyze (language: {language}): {message}"}
+            {"role": "user", "content": f"{SYSTEM_PROMPT}\n\nAnalyze (language: {language}): {message}"}
         ],
-        temperature=0.1,
         max_completion_tokens=500
     )
     text = response.choices[0].message.content
