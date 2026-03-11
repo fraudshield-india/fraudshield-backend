@@ -2,7 +2,6 @@ import azure.functions as func
 import json
 import logging
 import os
-from openai import AzureOpenAI
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
@@ -13,6 +12,7 @@ MODEL = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "o4-mini")
 def _get_client():
     global _client
     if _client is None:
+        from openai import AzureOpenAI
         _client = AzureOpenAI(
             api_key=os.environ["AZURE_OPENAI_KEY"],
             api_version="2024-12-01-preview",
@@ -116,8 +116,6 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
 
 # ── Telegram Bot ───────────────────────────────────────────────────────────────
 
-import requests as _requests
-
 _BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 _FUNCTION_KEY = os.environ.get("FUNCTION_KEY", "")
 _API_URL = os.environ.get(
@@ -168,6 +166,7 @@ _REPORT_MSG = """📋 <b>Cybercrime Complaint कैसे करें?</b>
 
 
 def _send_telegram(chat_id: int, text: str):
+    import requests as _requests
     _requests.post(
         f"{_TELEGRAM_API}/sendMessage",
         json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
@@ -242,6 +241,7 @@ def _handle_telegram_update(update: dict):
         headers = {"Content-Type": "application/json"}
         if _FUNCTION_KEY:
             headers["x-functions-key"] = _FUNCTION_KEY
+        import requests as _requests
         resp = _requests.post(
             _API_URL,
             json={"message": text, "source": "telegram", "sender": "telegram_user"},
