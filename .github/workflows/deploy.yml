@@ -1,9 +1,7 @@
 name: Deploy FraudShield to Azure Functions
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+  workflow_dispatch: # disabled automatic trigger — main_fraudshield-api.yml handles deployment
 
 env:
   AZURE_FUNCTIONAPP_NAME: fraudshield-api
