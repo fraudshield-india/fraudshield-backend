@@ -1,7 +1,14 @@
+import sys
+import os
+
+# Ensure bundled packages are found (WEBSITE_RUN_FROM_PACKAGE deployment)
+_pkg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".python_packages", "lib", "site-packages")
+if os.path.isdir(_pkg_path) and _pkg_path not in sys.path:
+    sys.path.insert(0, _pkg_path)
+
 import azure.functions as func
 import json
 import logging
-import os
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
