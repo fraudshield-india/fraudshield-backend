@@ -7,32 +7,9 @@
 
 ---
 
-### ▶️ Demo Video
-
-> **[▶️ Watch 3-minute Demo](URL_TO_BE_ADDED)** — AI Unlocked 2025 submission
-
----
-
-### 🏆 Evaluation Results
-
-> Evaluated live against Azure OpenAI o4-mini — March 2026
-
-| Metric | Score |
-|--------|-------|
-| **Scam Detection Accuracy** | **100%** |
-| **Precision** | **100%** |
-| **Recall** | **100%** |
-| **F1 Score** | **100%** |
-| Languages Tested | Hindi, Hinglish, English |
-| Model | Azure OpenAI o4-mini (Korea Central) |
-
-➡️ Full breakdown in [`evaluation/metrics.md`](evaluation/metrics.md)
-
----
-
 ### What is FraudShield India?
 
-FraudShield India is a real-time **UPI scam detection system** for 230M+ at-risk users in India, built entirely on **Microsoft Azure**.
+FraudShield India is a real-time **UPI scam detection system** for 230M+ at-risk users in India, built on **Microsoft Azure**.
 
 It scans SMS and chat messages in **Hindi, Hinglish, and English**, flags 8 major UPI scam patterns, explains the risk in plain Hindi, and helps users quickly reach **`cybercrime.gov.in`** or the **1930 helpline**.
 
@@ -75,7 +52,6 @@ Input Channels              Shared API                    AI Pipeline
 - **Complaint form pre-fill**: prepares incident summary for `cybercrime.gov.in` and 1930 helpline
 - **Telegram bot**: @FraudShieldIndiaBot — paste any suspicious message and get instant analysis
 - **Android SMS Monitor**: real-time background SMS scanning with Hindi push notifications
-- **Scam evolution tracking**: cosine similarity shows how new scam templates inherit patterns from older ones (2020–2025)
 - **Live threat dashboard**: India heatmap + scam network graph + real-time message tester
 
 ---
@@ -95,25 +71,11 @@ Input Channels              Shared API                    AI Pipeline
 
 ---
 
-### Scam Evolution (2020–2025)
-
-FraudShield tracks how scam templates evolve over time using text embeddings:
-
-| Template A | Template B | Similarity | Flag |
-|------------|------------|------------|------|
-| KBC Lottery 2020 | Jio Lucky Draw 2021 | 0.89 | 🔴 HIGH |
-| KYC Freeze 2023 | Digital Arrest 2024 | 0.86 | 🔴 HIGH |
-| Fake Cashback 2022 | E-Challan Phishing 2025 | 0.84 | 🔴 HIGH |
-| Fake Cashback 2022 | Digital Arrest 2024 | 0.83 | 🔴 HIGH |
-
-> New scam variants are detected because they inherit structural patterns from older scams (similarity > 0.82)
-
----
-
 ### API Usage
 
+**Classify a message:**
 ```bash
-curl -X POST "https://fraudshield-api.azurewebsites.net/api/classify" \
+curl -X POST "https://fraudshield-api-b5cpbgfpcmcbgeat.koreacentral-01.azurewebsites.net/api/classify?code=YOUR_FUNCTION_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Aapko Rs.1500 cashback mila hai. Collect request approve karein.",
@@ -129,7 +91,8 @@ Example response:
   "is_scam": true,
   "category": "fake_cashback",
   "confidence": 0.97,
-  "explanation_hindi": "Yeh message jhootha cashback ka bahana bana kar aap se paise katwane ki koshish kar raha hai.",
+  "explanation_en": "This message uses a fake cashback offer to trick the user into approving a UPI collect request.",
+  "explanation_hi": "यह संदेश नकली कैशबैक का बहाना बनाकर आपसे UPI collect request approve करवाने की कोशिश कर रहा है।",
   "red_flags": [
     "UPI collect request to receive cashback",
     "no prior transaction context",
@@ -139,27 +102,16 @@ Example response:
     "portal": "cybercrime.gov.in",
     "helpline": "1930",
     "evidence_to_collect": ["screenshot", "sender_id", "transaction_id"]
-  }
+  },
+  "action_required": true,
+  "report_url": "https://cybercrime.gov.in"
 }
 ```
 
-Health check:
+**Health check:**
 ```bash
-curl https://fraudshield-api.azurewebsites.net/api/health
+curl https://fraudshield-api-b5cpbgfpcmcbgeat.koreacentral-01.azurewebsites.net/api/health
 ```
-
----
-
-### Run Evaluation
-
-```bash
-git clone https://github.com/fraudshield-india/fraudshield-backend.git
-cd fraudshield-backend
-pip install requests
-python evaluation/evaluate.py --max 8
-```
-
-Results saved to `evaluation/metrics.md`.
 
 ---
 
@@ -167,11 +119,13 @@ Results saved to `evaluation/metrics.md`.
 
 Deployed automatically via **GitHub Actions → Azure Functions** on every push to `main`.
 
-Required GitHub secret:
+Required GitHub secrets:
 
 | Secret | Description |
 |--------|-------------|
-| `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` | Publish profile XML from fraudshield-api Function App |
+| `AZUREAPPSERVICE_CLIENTID_*` | Azure workload identity client ID |
+| `AZUREAPPSERVICE_TENANTID_*` | Azure tenant ID |
+| `AZUREAPPSERVICE_SUBSCRIPTIONID_*` | Azure subscription ID |
 
 Azure environment variables required:
 
@@ -179,6 +133,7 @@ Azure environment variables required:
 |----------|-------------|
 | `AZURE_OPENAI_ENDPOINT` | Azure AI Foundry o4-mini endpoint URL |
 | `AZURE_OPENAI_KEY` | Azure OpenAI API key |
+| `AZURE_OPENAI_DEPLOYMENT` | Model deployment name (e.g. `o4-mini`) |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token |
 | `COSMOS_DB_ENDPOINT` | Cosmos DB Gremlin URI |
 | `COSMOS_DB_KEY` | Cosmos DB primary key |
@@ -189,15 +144,13 @@ Azure environment variables required:
 
 | Repo | Description |
 |------|-------------|
-| [fraudshield-backend](https://github.com/fraudshield-india/fraudshield-backend) | Azure Functions API + Dashboard + Evaluation |
+| [fraudshield-backend](https://github.com/fraudshield-india/fraudshield-backend) | Azure Functions API + Dashboard |
 | [fraudshield-android](https://github.com/fraudshield-india/fraudshield-android) | Android SMS Monitor app (Kotlin, Material3) |
 
 ---
 
 ### Team
 
-**Boulevard of Secure Dreams** · MIT Manipal  
-**Competition:** AI Unlocked 2025 — Microsoft Azure Track  
-**Mission:** Make "forward to FraudShield" as natural as "forward to family group" for every suspicious UPI SMS in India.
+**Boulevard of Secure Dreams** · MIT Manipal
 
 > Report scams: **1930** | [cybercrime.gov.in](https://cybercrime.gov.in)
